@@ -1,0 +1,242 @@
+<!doctype html>
+
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>SDRAP Import</title>
+</head>
+
+<body>
+  <form>
+    <div>
+      <label>From:</label><br>
+      <select id="fromSelect" style="width: 500px;">
+        <option selected>sdrap_oxy_mac2020_Feb062022</option>
+        <option>sdrap_oxy_mac2012_Feb072022</option>
+        <option>sdrap_tet_10272020_pid95_add90</option>
+        <option>sdrap_ewoo_11032020_pid95_add90</option>
+      </select>
+    </div>
+    <div>
+      <label>To:</label><br>
+      <select id="toSelect" style="width: 500px;">
+        <option selected>mds_ies_db_data_1</option>
+        <option>mds_ies_db_data_2</option>
+        <option>mds_ies_db_data_3</option>
+        <option>mds_ies_db_data_4</option>
+      </select>
+    </div>
+    <div>
+      <label>MAC alias regex:</label><br>
+      <select id="macRegexSelect" style="width: 500px;">
+        <option>^(Contig|AM).*$</option>
+        <option selected>^Contig.*$</option>
+        <option>^AM.*$</option>
+        <option>^OXYTRI_MAC_.*$</option>
+        <option>^.*$</option>
+      </select>
+    </div>
+    <div>
+      <label>MIC alias regex:</label><br>
+      <select id="micRegexSelect" style="width: 500px;">
+        <option>^(ctg|deg)71800000.*$</option>
+        <option selected>^OXYTRI_MIC_.*$</option>
+        <option>^.*$</option>
+      </select>
+    </div>
+    <div>
+      <label>Stage Preset:</label><br>
+      <select id="stagePresetSelect" style="width: 500px;">
+        <option value="none">None</option>
+        <option selected value="oxyTriJrb310_mac2020,oxyTriJrb310_mic2014">Oxytricha Trifallax JRB310 MAC 2020/MIC 2014</option>
+        <option value="oxyTriJrb310_mac2012,oxyTriJrb310_mic2014">Oxytricha Trifallax JRB310 MAC 2012/MIC 2014</option>
+        <option value="">Tetememena</option>
+        <option value="">Euplotes</option>
+      </select>
+    </div>
+    <div>
+      <label>Stages:</label><br>
+      <select id='stagesSelect' multiple size=24 style="width: 500px;">
+        <option>create</option> <!-- No dependency -->
+        <option>tempName</option> <!-- Depends on create -->
+        <option>insertTempName_oxyTriJrb310_mac2020_genbankV1ToOxydb</option> <!-- Depends on create -->
+        <option>contig</option> <!-- Depends on tempName  -->
+        <option>match</option> <!-- Depends on contig -->
+        <option>pointer</option> <!-- Depends on contig -->
+        <option>properties</option> <!-- Depends on contig -->
+        <option>parameter</option> <!-- No dependency -->
+        <option>importGenes|createGene</option> <!-- No dependency -->
+        <option>importGenes|oxyTriJrb310_mac2012</option> <!-- Depends on contig -->
+        <option>importGenes|oxyTriJrb310_mac2020</option> <!-- Depends on contig -->
+        <option>importGenes|oxyTriJrb310_mic2014</option> <!-- Depends on contig -->
+        <option>protein|oxyTriJrb310_mac2012</option> <!-- Depends on gene -->
+        <option>protein|oxyTriJrb310_mac2020</option> <!-- Depends on gene -->
+        <option>makeIesTable_strict</option> <!-- Depends on contig/match -->
+        <option>makeIesTable_weak</option> <!-- Depends on contig/match -->
+        <option>coverage</option> <!-- Depends on contig/match/pointer/ies -->
+        <option>count</option> <!-- Depends on contig/gene/match/pointer/ies/properties -->
+        <option>makeIesBed_strict</option> <!-- Depends on makeIesTable -->
+        <option>makeIesBed_weak</option> <!-- Depends on makeIesTable -->
+        <option>alias</option> <!-- Depends on contig/gene -->
+        <option>updateAlias_oxyTriJrb310_mac2012</option> <!-- Depends on contig/alias  -->
+        <option>updateAlias_oxyTriJrb310_mac2020</option> <!-- Depends on contig/alias  -->
+        <option>updateAlias_oxyTriJrb310_mic2014</option> <!-- Depends on contig/alias  -->
+        <option>variant</option> <!-- Depends on contig -->
+        <option>updateVariant_oxyTriJrb310_mac2020</option> <!-- Depends on createVariant  -->
+        <option>stats</options> <!-- Depends on contig/match/makeIesTable_strict/pointer/importGenes/properties  -->
+        <option>goMap_2012</option> <!-- Depends on gene -->
+        <option>goTerms_2012</option> <!-- No dependency -->
+        <option>addToDatabaseDirectory_oxyTriJrb310_2012</option> <!-- No dependency -->
+        <option>addToDatabaseDirectory_oxyTriJrb310_2020</option> <!-- No dependency -->
+        <option>dropTempTables</option> <!-- No dependency -->
+        <option>dumpTables</option> <!-- Everything -->
+      </select>
+    </div>
+    <div>
+      <button id="submitButton" type="button">Submit</button>
+    </div>
+  </form>
+  
+  <pre id="progress"></pre>
+
+</body>
+
+<script>
+  function updateStagePreset() {
+    var presetType = {
+      create: true,
+      tempName: true,
+      insertTempName_oxyTriJrb310_mac2020_genbankV1ToOxydb: false,
+      contig: true,
+      match: true,
+      pointer: true,
+      properties: true,
+      parameter: true,
+      'importGenes|createGene': true,
+      'importGenes|oxyTriJrb310_mac2012': 'preset',
+      'importGenes|oxyTriJrb310_mac2020': 'preset',
+      'protein|oxyTriJrb310_mac2012': 'preset',
+      'protein|oxyTriJrb310_mac2020': 'preset',
+      makeIesTable_strict: true,
+      makeIesTable_weak: true,
+      coverage: true,
+      count: true,
+      makeIesBed_strict: true,
+      makeIesBed_weak: true,
+      alias: true,
+      updateAlias_oxyTriJrb310_mac2012: 'preset',
+      updateAlias_oxyTriJrb310_mac2020: 'preset',
+      updateAlias_oxyTriJrb310_mic2014: 'preset',
+      variant: true,
+      updateVariant_oxyTriJrb310_mac2020: 'preset',
+      stats: true,
+      addToDatabaseDirectory_oxyTriJrb310_mac2012: 'preset',
+      addToDatabaseDirectory_oxyTriJrb310_mac2020: 'preset',
+      dropTempTables: true,
+    };
+    
+    var presetIds = document.querySelector("#stagePresetSelect").selectedOptions[0].value;
+    presetIds = presetIds.split(',').filter(x => x.length > 0);
+
+    for (var option of document.querySelectorAll('#stagesSelect option')) {
+      option.selected = false;
+      if (!presetIds.includes('none')) {
+        if (presetType[option.text] === true) {
+          option.selected = true;
+        } else if (presetType[option.text] === 'preset') {
+          for (var presetId of presetIds) {
+            if (option.text.indexOf(presetId) >= 0) {
+              option.selected = true;
+              break;
+            }
+          }
+        }
+      }
+    }
+  }
+
+  function doNextStage() {
+
+    var from = document.querySelector("#fromSelect").selectedOptions[0].text;
+    var to = document.querySelector("#toSelect").selectedOptions[0].text;
+    var macRegex = document.querySelector("#macRegexSelect").selectedOptions[0].text;
+    var micRegex = document.querySelector("#micRegexSelect").selectedOptions[0].text;
+
+    if (currentStage >= doStages.length) {
+      progress.innerHTML += `Finished all stages\n`;
+      return;
+    }
+
+    var stage = doStages[currentStage];
+
+    progress.innerHTML += `Starting: '${stage}'\n`;
+
+    var request = new XMLHttpRequest();
+
+    request.onreadystatechange = function() {
+      if (this.readyState == 4 && this.status == 200) {
+        progress.innerHTML += this.responseText;
+        var failed = false;
+        for (var s of this.responseText.split('\n')) {
+          failed = failed || s.startsWith('Error');
+        }
+        if (failed) {
+          progress.innerHTML += `Failed: '${stage}'\n`;
+          progress.innerHTML += 'Import failed\n';
+        } else {
+          progress.innerHTML += `Ended: '${stage}'\n`;
+          currentStage++;
+          doNextStage();
+        }
+      }
+    }
+
+    if (stage.startsWith('makeIesTable')) {
+      var type = stage.split('_')[1];
+      request.open(
+        "GET",
+        `ies/makeIesTable.php?db=${to}&type=${type}`,
+        true,
+      );
+    } else if (stage.startsWith('importGenes')) {
+      var subStage = stage.split('|')[1];
+      request.open(
+        "GET",
+        `genes/importGenes.php?db=${to}&stage=${subStage}`,
+        true,
+      );
+    } else {
+      request.open(
+        "GET",
+        `main/import.php?from=${from}&to=${to}&macRegex=${macRegex}&micRegex=${micRegex}&stage=${stage}`,
+        true,
+      );
+    }
+
+    request.send();
+  }
+
+  var doStages = null;
+  var progress = null;
+  var stages = null;
+  var currentStage = null;
+
+  window.addEventListener('load', () => {
+    progress = document.querySelector("#progress")
+    stages = document.querySelector("#stagesSelect");
+
+    document.querySelector('#stagePresetSelect').onchange = updateStagePreset;
+    updateStagePreset(); // run once to update
+    document.querySelector('#submitButton').onclick = () => {
+      progress.innerHTML = '';
+      currentStage = 0;
+      doStages = [];
+      for (var i = 0; i < stages.selectedOptions.length; i++) {
+        doStages.push(stages.selectedOptions[i].text);
+      }
+      doNextStage();
+    }
+  });
+</script>
+
+</html>

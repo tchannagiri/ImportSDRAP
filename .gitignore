@@ -1,0 +1,11 @@
+.vscode/
+output/
+__pycache__/
+*.fasta
+*.csv
+*.gff3
+*.gff
+*.faa
+*.annotations
+*.db
+*.zip
