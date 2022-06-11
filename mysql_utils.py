@@ -26,7 +26,7 @@ def upload_in_chunks(
   data: pd.DataFrame,
   columns: list[str],
   cursor,
-  table: str,
+  table_name: str,
   batch_size: int,
 ):
   columns_sql = ", ".join([f"`{x}`" for x in columns])
@@ -35,7 +35,7 @@ def upload_in_chunks(
     values = make_sql_values(data.loc[i : (i + batch_size - 1), columns])
     cursor.execute(
       f"""
-      INSERT INTO {table}
+      INSERT INTO {table_name}
       ({columns_sql})
       VALUES {values}
       """

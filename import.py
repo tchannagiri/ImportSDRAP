@@ -7,6 +7,7 @@ import pandas as pd
 import numpy as np
 import collections
 
+import constants
 import common_utils
 import interval_utils
 import mysql_utils
@@ -139,26 +140,33 @@ def create_alias_table(
     alias_to = alias_to.dropna(axis='index')
     alias_to = alias_to.rename({"nuc_id": "id", "primary": "name"}, axis="columns")
     alias_to["table"] = "contig"
-    for i in range(0, alias_to.shape[0], SQL_BATCH_UPLOAD_ROWS):
-      common_utils.log(f"{i} / {alias_to.shape[0]}")
-      values = mysql_utils.make_sql_values(
-        alias_to.loc[
-          i : (i + SQL_BATCH_UPLOAD_ROWS - 1),
-          ["id", "name", "alias", "table", "type"]
-        ])
-      cursor.execute(
-        f"""
-        INSERT INTO `{to_db}`.`alias`
-        (
-          `id`,
-          `name`,
-          `alias`,
-          `table`,
-          `type`
-        )
-        VALUES {values};
-        """
-      )
+    mysql_utils.upload_in_chunks(
+      alias_to,
+      ["id", "name", "alias", "table", "type"],
+      cursor,
+      f"`{to_db}`.`alias`",
+      constants.SQL_BATCH_UPLOAD_ROWS,
+    )
+    # for i in range(0, alias_to.shape[0], SQL_BATCH_UPLOAD_ROWS):
+    #   common_utils.log(f"{i} / {alias_to.shape[0]}")
+    #   values = mysql_utils.make_sql_values(
+    #     alias_to.loc[
+    #       i : (i + SQL_BATCH_UPLOAD_ROWS - 1),
+    #       ["id", "name", "alias", "table", "type"]
+    #     ])
+    #   cursor.execute(
+    #     f"""
+    #     INSERT INTO `{to_db}`.`alias`
+    #     (
+    #       `id`,
+    #       `name`,
+    #       `alias`,
+    #       `table`,
+    #       `type`
+    #     )
+    #     VALUES {values};
+    #     """
+    #   )
   cursor.close()
   conn.close()
 
@@ -248,6 +256,7 @@ def create_match_table(to_db: str, from_db: str):
 def create_pointer_table(to_db: str, from_db: str):
   common_utils.log(f"create_pointer_table {to_db} {from_db}")
   
+  conn = mysql_utils.get_connection()
   cursor = conn.cursor()
   cursor.execute(f"DROP TABLE IF EXISTS `{to_db}`.`pointer`;")
   cursor.execute(
@@ -669,7 +678,7 @@ def create_coverage_table(to_db: str, from_db: str):
   conn.close()
 
 def create_count_table(to_db: str, from_db: str):
-  common_utils.log(f"create_coverage_table {to_db} {from_db}")
+  common_utils.log(f"create_count_table {to_db} {from_db}")
 
   conn = mysql_utils.get_connection()
   cursor = conn.cursor()
@@ -776,8 +785,14 @@ def create_count_table(to_db: str, from_db: str):
 
   for i in [0, 1]:
     # update mac and mic separately
-    aNuc = ["mac", "mic"][i]
-    bNuc = ["mic", "mac"][i]
+    if i == 0:
+      a_nuc = "mac"
+      b_nuc = "mic"
+    elif i == 1:
+      a_nuc = "mic"
+      b_nuc = "mic"
+    else:
+      raise Exception("Impossible.")
 
     # get `mds`, `ies_strict`, `pointer`
     for j in [0, 1, 2]:
@@ -802,11 +817,11 @@ def create_count_table(to_db: str, from_db: str):
           `{to_db}`.`count` AS `C`,
           (
             SELECT
-              `{aNuc}_contig_id` AS `contig_id`,
+              `{a_nuc}_contig_id` AS `contig_id`,
               COUNT(*) AS `num`
             FROM `{to_db}`.`{table}`
             WHERE {where}
-            GROUP BY `{aNuc}_contig_id`
+            GROUP BY `{a_nuc}_contig_id`
           ) AS `T`
         SET `C`.`{field}` = `T`.`num`
         WHERE `C`.`contig_id` = `T`.`contig_id`;
@@ -820,14 +835,14 @@ def create_count_table(to_db: str, from_db: str):
         `{to_db}`.`count` AS `C`,
         (
           SELECT 
-            `{aNuc}_contig_id` AS `contig_id`,
-            COUNT(DISTINCT `{bNuc}_contig_id`) AS `num`
+            `{a_nuc}_contig_id` AS `contig_id`,
+            COUNT(DISTINCT `{b_nuc}_contig_id`) AS `num`
           FROM
             `{to_db}`.`match`
           WHERE
             `is_preliminary` = '1'
           GROUP BY
-            `{aNuc}_contig_id`
+            `{a_nuc}_contig_id`
         ) AS `T`
       SET
         `C`.`hit_num` = `T`.`num`
@@ -843,7 +858,7 @@ def create_count_table(to_db: str, from_db: str):
         `{to_db}`.`count` AS `C`,
         (
           SELECT
-            `{aNuc}_contig_id` as `contig_id`,
+            `{a_nuc}_contig_id` as `contig_id`,
             COUNT(*) AS `properties_hit_num`,
             SUM(`non_gapped`) AS `non_gapped_num`,
             SUM(`non_overlapping`) AS `non_overlapping_num`,
@@ -860,7 +875,7 @@ def create_count_table(to_db: str, from_db: str):
           FROM
             `{to_db}`.`properties`
           GROUP BY
-            `{aNuc}_contig_id` 
+            `{a_nuc}_contig_id` 
         ) AS `P`
       SET
         `C`.`properties_hit_num` = `P`.`properties_hit_num`,
