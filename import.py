@@ -1,3 +1,7 @@
+import sys
+import os
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))) # allow importing the utils dir
+
 import mysql.connector
 import pandas as pd
 import numpy as np
@@ -661,6 +665,280 @@ def create_coverage_table(to_db: str, from_db: str):
         `T`.`mic_contig_id` = `NMIC`.`contig_id`;"
       """
     )
+  cursor.close()
+  conn.close()
+
+def create_count_table(to_db: str, from_db: str):
+  common_utils.log(f"create_coverage_table {to_db} {from_db}")
+
+  conn = mysql_utils.get_connection()
+  cursor = conn.cursor()
+
+  cursor.execute(f"DROP TABLE IF EXISTS `{to_db}`.`count`;")
+  cursor.execute(
+    f"""
+    CREATE TABLE `{to_db}`.`count` (
+      `contig_id` INT NOT NULL COMMENT 'primary key of the `contig` table for the corresponding contig',
+      `name` VARCHAR(50) NOT NULL COMMENT 'contig name',
+      `gene_num` INT NOT NULL COMMENT 'Number of genes on this contig',
+      `hit_num` INT NOT NULL COMMENT 'Number of contigs that have an MDS with this one',
+      `mds_num` INT NOT NULL COMMENT 'Number of total MDSs of this contig with all hits',
+      `pointer_num` INT NOT NULL COMMENT 'Number of total pointers of this contig with all hits',
+      `ies_num` INT NOT NULL COMMENT 'Number of total strict of IESs of this contig with all hits',
+      `properties_hit_num` INT NOT NULL COMMENT 'Number of contigs that have an entry in `properties` with this one',
+      `non_gapped_num` INT NOT NULL COMMENT 'Number of `non_gapped` hits in the `properties` table for this contig',
+      `non_overlapping_num` INT NOT NULL COMMENT 'Number of `non_overlapping` hits in the `properties` table for this contig',
+      `non_repeating_num` INT NOT NULL COMMENT 'Number of `non_repeating` hits in the `properties` table for this contig',
+      `exceeded_clique_limit_num` INT NOT NULL COMMENT 'Number of `exceeded_clique_limit` hits in the `properties` table for this contig',
+      `weakly_complete_num` INT NOT NULL COMMENT 'Number of `weakly_complete` hits in the `properties` table for this contig',
+      `strongly_complete_num` INT NOT NULL COMMENT 'Number of `strongly_complete` hits in the `properties` table for this contig',
+      `weakly_consecutive_num` INT NOT NULL COMMENT 'Number of `weakly_consecutive` hits in the `properties` table for this contig',
+      `strongly_consecutive_num` INT NOT NULL COMMENT 'Number of `strongly_consecutive` hits in the `properties` table for this contig',
+      `weakly_ordered_num` INT NOT NULL COMMENT 'Number of `weakly_ordered` hits in the `properties` table for this contig',
+      `strongly_ordered_num` INT NOT NULL COMMENT 'Number of `strongly_ordered` hits in the `properties` table for this contig',
+      `weakly_non_scrambled_num` INT NOT NULL COMMENT 'Number of `weakly_non_scrambled` hits in the `properties` table for this contig',
+      `strongly_non_scrambled_num` INT NOT NULL COMMENT 'Number of `strongly_non_scrambled` hits in the `properties` table for this contig',
+      PRIMARY KEY (`contig_id`)
+    ) COMMENT='Summary data about the hits on a contig';
+    """
+  )
+
+  # initialize table to all 0
+  cursor.execute(
+    f"""
+    INSERT INTO
+      `{to_db}`.`count`
+      (
+        `contig_id`,
+        `name`,
+        `gene_num`,
+        `hit_num`,
+        `mds_num`,
+        `pointer_num`,
+        `ies_num`,
+        `properties_hit_num`,
+        `non_gapped_num`,
+        `non_overlapping_num`,
+        `non_repeating_num`,
+        `exceeded_clique_limit_num`,
+        `weakly_complete_num`,
+        `strongly_complete_num`,
+        `weakly_consecutive_num`,
+        `strongly_consecutive_num`,
+        `weakly_ordered_num`,
+        `strongly_ordered_num`,
+        `weakly_non_scrambled_num`,
+        `strongly_non_scrambled_num`
+      )
+    SELECT
+      `contig_id`,
+      `name`,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0
+    FROM
+      `{to_db}`.`contig`;
+    """
+  )
+
+  # get `gene`
+  cursor.execute(
+    f"""
+    UPDATE
+      `{to_db}`.`count` AS `C`,
+      (
+        SELECT
+          `contig_id` AS `contig_id`,
+          COUNT(*) AS `num`
+        FROM `{to_db}`.`gene`
+        WHERE `type` = 'gene'
+        GROUP BY `contig_id`
+      ) AS `G`
+    SET `C`.`gene_num` = `G`.`num`
+    WHERE `C`.`contig_id` = `G`.`contig_id`;
+    """
+  )
+
+  for i in [0, 1]:
+    # update mac and mic separately
+    aNuc = ["mac", "mic"][i]
+    bNuc = ["mic", "mac"][i]
+
+    # get `mds`, `ies_strict`, `pointer`
+    for j in [0, 1, 2]:
+      if j == 0:
+        table = "match"
+        field = "mds_num"
+        where = "`is_preliminary` = 1"
+      elif j == 1:
+        table = "ies_strict"
+        field = "ies_num"
+        where = "1"
+      elif j == 2:
+        table = "pointer"
+        field = "pointer_num"
+        where = "`is_preliminary` = 1"
+      else:
+        raise Exception("Impossible.")
+
+      cursor.execute(
+        f"""
+        UPDATE
+          `{to_db}`.`count` AS `C`,
+          (
+            SELECT
+              `{aNuc}_contig_id` AS `contig_id`,
+              COUNT(*) AS `num`
+            FROM `{to_db}`.`{table}`
+            WHERE {where}
+            GROUP BY `{aNuc}_contig_id`
+          ) AS `T`
+        SET `C`.`{field}` = `T`.`num`
+        WHERE `C`.`contig_id` = `T`.`contig_id`;
+        """
+      )
+
+    # get `contig_hits`
+    cursor.execute(
+      f"""
+      UPDATE
+        `{to_db}`.`count` AS `C`,
+        (
+          SELECT 
+            `{aNuc}_contig_id` AS `contig_id`,
+            COUNT(DISTINCT `{bNuc}_contig_id`) AS `num`
+          FROM
+            `{to_db}`.`match`
+          WHERE
+            `is_preliminary` = '1'
+          GROUP BY
+            `{aNuc}_contig_id`
+        ) AS `T`
+      SET
+        `C`.`hit_num` = `T`.`num`
+      WHERE
+        `C`.`contig_id` = `T`.`contig_id`;
+      """
+    )
+
+    # update remaining properties
+    cursor.execute(
+      f"""
+      UPDATE
+        `{to_db}`.`count` AS `C`,
+        (
+          SELECT
+            `{aNuc}_contig_id` as `contig_id`,
+            COUNT(*) AS `properties_hit_num`,
+            SUM(`non_gapped`) AS `non_gapped_num`,
+            SUM(`non_overlapping`) AS `non_overlapping_num`,
+            SUM(`non_repeating`) AS `non_repeating_num`,
+            SUM(`exceeded_clique_limit`) AS `exceeded_clique_limit_num`,
+            SUM(`weakly_complete`) AS `weakly_complete_num`,
+            SUM(`strongly_complete`) AS `strongly_complete_num`,
+            SUM(`weakly_consecutive`) AS `weakly_consecutive_num`,
+            SUM(`strongly_consecutive`) AS `strongly_consecutive_num`,
+            SUM(`weakly_ordered`) AS `weakly_ordered_num`,
+            SUM(`strongly_ordered`) AS `strongly_ordered_num`,
+            SUM(`weakly_non_scrambled`) AS `weakly_non_scrambled_num`,
+            SUM(`strongly_non_scrambled`) AS `strongly_non_scrambled_num`
+          FROM
+            `{to_db}`.`properties`
+          GROUP BY
+            `{aNuc}_contig_id` 
+        ) AS `P`
+      SET
+        `C`.`properties_hit_num` = `P`.`properties_hit_num`,
+        `C`.`non_gapped_num` = `P`.`non_gapped_num`,
+        `C`.`non_overlapping_num` = `P`.`non_overlapping_num`,
+        `C`.`non_repeating_num` = `P`.`non_repeating_num`,
+        `C`.`exceeded_clique_limit_num` = `P`.`exceeded_clique_limit_num`,
+        `C`.`weakly_complete_num` = `P`.`weakly_complete_num`,
+        `C`.`strongly_complete_num` = `P`.`strongly_complete_num`,
+        `C`.`weakly_consecutive_num` = `P`.`weakly_consecutive_num`,
+        `C`.`strongly_consecutive_num` = `P`.`strongly_consecutive_num`,
+        `C`.`weakly_ordered_num` = `P`.`weakly_ordered_num`,
+        `C`.`strongly_ordered_num` = `P`.`strongly_ordered_num`,
+        `C`.`weakly_non_scrambled_num` = `P`.`weakly_non_scrambled_num`,
+        `C`.`strongly_non_scrambled_num` = `P`.`strongly_non_scrambled_num`
+      WHERE
+        `C`.`contig_id` = `P`.`contig_id`;
+      """
+    )
+
+  cursor.close()
+  conn.close()
+
+# #track name="prec_eliminated_sequences" description="intervals comprising complement of the precursor segments labelled comp_[left-flanking-segment-prod-id]_[left-flanking-segment-index]_[right-flanking-segment-prod-id]_[right-flanking-segment-index]" itemRgb-"On"
+# OXYTRI_MIC_33550	1	8703	none_0_Contig4386.0_-1	0	+	1	8703	255,0,153
+# sdrap_oxy_mac2012_100720_prec_eliminated_sequences.bed
+def make_ie_bed(to_db: str, from_db: str, ies_type: str):
+  handle = open(f"../output/{from_db}_prec_{ies_type}_ies_sequences.bed", "w")
+
+  # write header
+  if ies_type == "strict":
+    handle.write(
+      '#track name="prec_strict_ies_sequences" ' +
+      'description="Strict IESs. Intervals on the precursor segment between two consecutive matches of a product segment ' +
+      'that do not overlap matches of any other product segment. ' +
+      'Labelled [product-name]_[left-flanking-match-indexes]_[right-flanking-match-indexes]" ' +
+      'itemRgb-"On"\n'
+    )
+  elif ies_type == "weak":
+    handle.write(
+      '#track name="prec_weak_ies_sequences" ' +
+      'description="Weak IESs. Intervals on the precursor segment between two consecutive matches of a product segment.' +
+      'Labelled [product-name]_[left-flanking-match-indexes]_[right-flanking-match-indexes]" ' +
+      'itemRgb-"On"\n'
+    )
+  else:
+    raise Exception("Unknown ies type: " + str(ies_type))
+
+  conn = mysql_utils.get_connection()
+  cursor = conn.cursor(dictionary=True)
+  cursor.execute("SELECT COUNT(*) AS `count` FROM `{$to}`.`ies_{$type}`;")
+  num_ies = cursor.fetchall()["count"]
+  
+  batch_size_rows = 10000
+  for i in range(0, num_ies, batch_size_rows):
+    cursor.execute(
+      f"""
+      SELECT
+        `mic_name`,
+        `mic_start`,
+        `mic_end`,
+        `mac_name`,
+        `left_index`,
+        `right_index`
+      FROM `{to_db}`.`ies_{ies_type}`
+      LIMIT {i}, {batch_size_rows};
+      """
+    )
+
+    for result in cursor.fetchall():
+      handle.write(
+        f"{result['mic_name']}\t{result['mic_start']}\t{result['mic_end']}\t" + # chrom chromStart chromEnd
+        f"{result['mac_name']}_{result['left_index']}_{result['right_index']}\t" + # name
+        f"0\t+\t{result['mic_start']}\t{result['mic_end']}\t255,0,153\n" # score strand thickStart thickEnd itemRGB
+      )
+
+  cursor.close()
+  conn.close()
 
 from_db = "sdrap_oxy_mac2012_May_30_2022"
 to_db = "hello_world"
@@ -673,7 +951,8 @@ to_db = "hello_world"
 # create_pointer_table(to_db, from_db)
 # create_properties_table(to_db, from_db)
 # create_parameter_table(to_db, from_db)
-create_coverage_table(to_db, from_db)
+# create_coverage_table(to_db, from_db)
+create_count_table(to_db, from_db)
 
 # cursor = conn.cursor(dictionary=True)
 # # cursor.execute(f"SELECT MAX(`mac_contig_id`) FROM `hello_world`.`properties`")

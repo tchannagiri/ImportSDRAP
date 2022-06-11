@@ -1,1 +1,0 @@
-DUde just prepare the tables in CSV format and make your life much easier.

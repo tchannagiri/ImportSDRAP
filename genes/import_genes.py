@@ -12,6 +12,32 @@ OXYTRI_MAC_2012_GENE_CSV = os.path.join(GENE_DIR, 'Oxytricha_trifallax_022112.cs
 OXYTRI_MIC_2014_GENE_GFF = os.path.join(GENE_DIR, 'oxy_tri_jrb310_mic_2014.gff')
 OXYTRI_MIC_2014_GENE_CSV = os.path.join(GENE_DIR, 'oxy_tri_jrb310_mic_2014.csv')
 
+
+GENE_SQL_COLUMN_SPEC = {
+  'gene_id': "int(11) NOT NULL AUTO_INCREMENT COMMENT 'Primary index of the `gene` table'",
+  'contig_id': "int(10) NOT NULL COMMENT 'ID of the parent contig in the `contig` table'",
+  'contig_name': "varchar(50) NOT NULL COMMENT 'Name of the parent contig'",
+  'contig_nucleus': "ENUM('mac','mic') NOT NULL COMMENT 'Type of nucleus of the parent contig'",
+  'source': "varchar(50) NOT NULL COMMENT 'Software that produced this annotation'",
+  'type': "varchar(50) NOT NULL COMMENT 'Type of feature'",
+  'start': "int(11) NOT NULL COMMENT 'Start base pair'",
+  'end': "int(11) NOT NULL COMMENT 'End base pair'",
+  'length': "int(11) NOT NULL COMMENT 'Length of feature'",
+  'score': "float COMMENT 'Score'",
+  'strand': "enum('+','-','.') NOT NULL COMMENT 'Orientation of how this feature is read'",
+  'phase': "enum('.','0','1','2') NOT NULL COMMENT 'Where the feature begins with reference to the reading frame'",
+  'attr_id': "varchar(50) NOT NULL COMMENT 'Unique ID of the feature'",
+  'attr_parent': "varchar(50) COMMENT 'ID of the parent feature or NULL if none'",
+  'attr_name': "varchar(50) COMMENT 'Human readable name of the feature'",
+  'attr_note': "varchar(300) COMMENT 'Additional details about the feature'",
+  'attr_parent_gene': "varchar(300) COMMENT 'ID of the gene this feature is on'",
+}
+GENE_SQL_KEY_SPEC = [
+  ('PRIMARY KEY', ('gene_id',)),
+  ('KEY', ('attr_id',)),
+  ('KEY', ('contig_id',))
+]
+
 def log(str):
     print(time.strftime("%H:%M:%S", time.localtime()) + ': ' + str)
 
@@ -206,30 +232,6 @@ def make_oxytri_mic2014_gene_csv():
   data = get_attr_parent_gene(data)
   data.to_csv(OXYTRI_MIC_2014_GENE_CSV, index=False)
 
-GENE_SQL_COLUMN_SPEC = {
-  'gene_id': "int(11) NOT NULL AUTO_INCREMENT COMMENT 'Primary index of the `gene` table'",
-  'contig_id': "int(10) NOT NULL COMMENT 'ID of the parent contig in the `contig` table'",
-  'contig_name': "varchar(50) NOT NULL COMMENT 'Name of the parent contig'",
-  'contig_nucleus': "ENUM('mac','mic') NOT NULL COMMENT 'Type of nucleus of the parent contig'",
-  'source': "varchar(50) NOT NULL COMMENT 'Software that produced this annotation'",
-  'type': "varchar(50) NOT NULL COMMENT 'Type of feature'",
-  'start': "int(11) NOT NULL COMMENT 'Start base pair'",
-  'end': "int(11) NOT NULL COMMENT 'End base pair'",
-  'length': "int(11) NOT NULL COMMENT 'Length of feature'",
-  'score': "float COMMENT 'Score'",
-  'strand': "enum('+','-','.') NOT NULL COMMENT 'Orientation of how this feature is read'",
-  'phase': "enum('.','0','1','2') NOT NULL COMMENT 'Where the feature begins with reference to the reading frame'",
-  'attr_id': "varchar(50) NOT NULL COMMENT 'Unique ID of the feature'",
-  'attr_parent': "varchar(50) COMMENT 'ID of the parent feature or NULL if none'",
-  'attr_name': "varchar(50) COMMENT 'Human readable name of the feature'",
-  'attr_note': "varchar(300) COMMENT 'Additional details about the feature'",
-  'attr_parent_gene': "varchar(300) COMMENT 'ID of the gene this feature is on'",
-}
-GENE_SQL_KEY_SPEC = [
-  ('PRIMARY KEY', ('gene_id',)),
-  ('KEY', ('attr_id',)),
-  ('KEY', ('contig_id',))
-]
 
 def get_sql_connection():
   # Note: must have a ssh tunnel setup on your computer to forward port 8888 to the server

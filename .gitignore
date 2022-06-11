@@ -3,6 +3,7 @@ output/
 __pycache__/
 *.fasta
 *.csv
+*.tsv
 *.gff3
 *.gff
 *.faa
