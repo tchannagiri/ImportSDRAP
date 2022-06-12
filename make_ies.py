@@ -1,12 +1,35 @@
 
+import mysql.connector
 import collections
+
+import pandas as pd
 
 import constants
 import common_utils
 import mysql_utils
+import interval_utils
 
 
-def getMicContigs(cursor, db):
+IES_COLUMNS = [
+  "mic_contig_id",
+  "mic_name",
+  "mic_start",
+  "mic_end",
+  "length",
+  "mac_contig_id",
+  "mac_name",
+  "left_index",
+  "right_index",
+  "left_orientation",
+  "right_orientation",
+]
+
+BATCH_SIZE_CONTIGS = 100
+
+def get_mic_contigs(
+  cursor,
+  db: str,
+):
   cursor.execute(
     f"""
     SELECT
@@ -16,28 +39,16 @@ def getMicContigs(cursor, db):
     WHERE `nucleus` = 'mic';
     """
   )
-  return cursor.fetchall()
+  return pd.DataFrame.from_records(
+    cursor.fetchall(),
+    columns = ["contig_id", "name"]
+  )
 
-# function makeMatch(start, end, mac) {
-#   return
-#     array(
-#       'start' => start,
-#       'end' => end,
-#       'mac' => mac
-#     );
-# }
-
-# function makeMac(contig_id, name, index, orientation) {
-#   return
-#     array(
-#       'contig_id' => contig_id,
-#       'name' => name,
-#       'index' => index,
-#       'orientation' => orientation
-#     );
-# }
-
-def getMacMatches(cursor, db: str, micId: str):
+def get_mac_matches(
+  cursor,
+  db: str,
+  mic_contig_id: str,
+):
   cursor.execute(
     f"""
     SELECT
@@ -50,269 +61,182 @@ def getMacMatches(cursor, db: str, micId: str):
     FROM
       `{db}`.`match`
     WHERE
-      `mic_contig_id` = '{micId}'
+      `mic_contig_id` = '{mic_contig_id}'
     AND
       `is_preliminary` = 1;
     """
   )
 
-  matches = []
-  for assoc in cursor.fetchall():
-    matches.append({
-      'start': assoc['mic_start'],
-      'end': assoc['mic_end'],
-      'mac': {
-          assoc['mac_name']: {
-            'contig_id': assoc['mac_contig_id'],
-            'name': assoc['mac_name'],
-            'index': [assoc['index']],
-            'orientation': [assoc['orientation']],
-          }
-      }
-    })
-  return matches
-
-# function makeMergedMatch(start, end, start_macs, end_macs) {
-#   return
-#     array(
-#       'start' => start,
-#       'end' => end,
-#       'start_macs' => start_macs,
-#       'end_macs' => end_macs
-#     );
-# }
-
-# function toMergedMatch(match) {
-#   return
-#     makeMergedMatch(
-#       match['start'],
-#       match['end'],
-#       match['mac'],
-#       match['mac']
-#     );
-# }
-
-def mergeable(start_1, end_1, start_2, end_2):
-  if (end_1 <= (start_2 - 2)):
-     return False
-  if (end_2 <= (start_1 - 2)):
-     return False
-  return True
-
-def mergeMacs(mac1, mac2):
-  if ((mac1['name'] != mac2['name']) or (mac1['contig_id'] != mac2['contig_id'])):
-    raise Exception('MACs are not mergable')
-
-  index_orient = (
-    list(zip(mac1['index'], mac1['orientation'])) +
-    list(zip(mac2['index'], mac2['orientation']))
+  return pd.DataFrame.from_records(
+    cursor.fetchall(),
+    columns = [
+      "mic_start",
+      "mic_end",
+      "mac_contig_id",
+      "mac_name",
+      "index",
+      "orientation"
+    ],
   )
-  index_orient = list(sorted(index_orient, key = lambda x: x[0]))
 
-  return {
-    'contig_id': mac1['contig_id'],
-    'name': mac1['name'],
-    'index': [x[0] for x in index_orient],
-    'orientation': [x[1] for x in index_orient],
-  }
+# def get_mic_ies_strict(
+#   cursor,
+#   db: str,
+#   mic_name: str,
+#   mic_contig_id: str,
+# ):
+#   matches = get_mac_matches(cursor, db, mic_contig_id)
 
-def mergeAllMacs(macs1: dict, macs2: dict):
-  allNames = set(macs1.keys()) | set(macs2.keys())
-  merged = {}
-  for name in allNames:
-    if (name in macs1) and (name in macs2):
-      merged[name] = mergeMacs(macs1[name], macs2[name])
-    elif name in macs1:
-      merged[name] = macs1[name]
-    elif name in macs2:
-      merged[name] = macs2[name]
-    else:
-      raise Exception("Impossible")
-  return merged
+#   intervals = matches[["mic_start", "mic_end"]]
+#   intervals = intervals.rename({"mic_start": "start", "mic_end": "end"}, axis="columns")
+#   intervals = intervals.to_dict("records")
+#   intervals = interval_utils.get_union(intervals)
+#   intervals_ies = []
+#   for i in range(len(intervals) - 1):
+#     intervals_ies.append({"start": intervals[i]["end"] + 1, "end": intervals[i + 1]["start"] - 1})
+#   intervals_ies = pd.DataFrame.from_records(intervals_ies, columns=["start", "end"])
 
-# For the non-strict ies, separate out by the MAC contig
-def groupMatchesByMac(matches: dict):
-  groupedMatches = collections.defaultdict(list)
-  for match in matches:
-    name = next(iter(match['mac'].keys()))
-    groupedMatches[name].append(match)
-  return list(groupedMatches.values())
+#   def collapse_matches(data: pd.DataFrame):
+#     data = data.sort_values("index")
+#     return pd.Series({
+#       "index": ",".join([str(i) for i in data["index"]]),
+#       "orientation": ",".join(data["orientation"])
+#     })
+
+#   matches_left = matches.drop("mic_start", axis="columns")
+#   matches_left = matches_left.rename({"mic_end": "start"}, axis="columns")
+#   matches_left["start"] += 1
+#   matches_left = pd.merge(intervals_ies, matches_left, on="start")
+#   matches_left = matches_left.groupby(["start", "end", "mac_contig_id", "mac_name"])
+#   matches_left = matches_left.apply(collapse_matches)
+
+#   matches_right = matches.drop("mic_end", axis="columns")
+#   matches_right = matches_right.rename({"mic_start": "end"}, axis="columns")
+#   matches_right["end"] -= 1
+#   matches_right = pd.merge(intervals_ies, matches_right, on="end")
+#   matches_right = matches_right.groupby(["start", "end", "mac_contig_id", "mac_name"])
+#   matches_right = matches_right.apply(collapse_matches)
+
+#   ies = pd.merge(
+#     matches_left,
+#     matches_right,
+#     how = "inner",
+#     left_index = True,
+#     right_index = True,
+#     suffixes = ("_left", "_right")
+#   )
+#   ies = ies.reset_index()
+#   ies["length"] = ies["end"] - ies["start"] + 1
+#   ies["mic_name"] = mic_name
+#   ies["mic_contig_id"] = mic_contig_id
+
+#   ies = ies.rename(
+#     {
+#       "start": "mic_start",
+#       "end": "mic_end",
+#       "index_left": "left_index",
+#       "index_right": "right_index",
+#       "orientation_left": "left_orientation",
+#       "orientation_right": "right_orientation",
+#     },
+#     axis = "columns",
+#   )
+#   ies = ies[IES_COLUMNS]
+#   return ies
 
 
-def mergeMatches(merged1, merged2):
-  if merged1['start'] < merged2['start']:
-    start = merged1['start']
-    start_macs = merged1['start_macs']
-  elif merged1['start'] > merged2['start']:
-    start = merged2['start']
-    start_macs = merged2['start_macs']
-  elif merged1['start'] == merged2['start']:
-    start = merged1['start']
-    start_macs = mergeAllMacs(merged1['start_macs'], merged2['start_macs'])
+def get_mic_ies(
+  cursor,
+  db: str,
+  ies_type: str,
+  mic_name: str,
+  mic_contig_id: str,
+):
+  match_data = get_mac_matches(cursor, db, mic_contig_id)
 
-  if merged1['end'] < merged2['end']:
-    end = merged2['end']
-    end_macs = merged2['end_macs']
-  elif merged1['end'] > merged2['end']:
-    end = merged1['end']
-    end_macs = merged1['end_macs']
-  elif merged1['end'] == merged2['end']:
-    end = merged1['end']
-    end_macs = mergeAllMacs(merged1['end_macs'], merged2['end_macs'])
-  
-  return {
-    'start': start,
-    'end': end,
-    'start_macs': start_macs,
-    'end_macs': end_macs,
-  }
+  if ies_type == "strict":
+    # matches from all MAC contigs are pooled together
+    match_data_list = [match_data]
+  elif ies_type == "weak":
+    # matches from different MAC contigs are separated
+    match_data_list = [data for _, data in match_data.groupby('mac_contig_id')]
+  else:
+    raise Exception(f"Unknown IES type: {ies_type}")
 
-# function cmpByStart(x, y) {
-#   if (x['start'] < y['start']) return -1;
-#   if (x['start'] > y['start']) return 1;
-#   return 0;
-# }
+  ies_data_list = []
+  for match_data in match_data_list:
+    # Get the match intervals
+    intervals = match_data[["mic_start", "mic_end"]]
+    intervals = intervals.rename({"mic_start": "start", "mic_end": "end"}, axis="columns")
+    intervals = intervals.to_dict("records")
+    intervals = interval_utils.get_union(intervals)
 
-def mergeAllMatches(matches):
-  matches = list(sorted(matches, key=lambda x: x['start']))
-  mergedMatches = []
-  for match in matches:
-    merged = {
-      "start": match["start"],
-      "end": match["end"],
-      "start_macs": match["mac"],
-      "end_macs": match["mac"],
-    }
+    # Get the IESs as the intervals between the unions of the matches
+    intervals_ies = []
+    for i in range(len(intervals) - 1):
+      intervals_ies.append({"start": intervals[i]["end"] + 1, "end": intervals[i + 1]["start"] - 1})
+    intervals_ies = pd.DataFrame.from_records(intervals_ies, columns=["start", "end"])
 
-    if len(mergedMatches) > 0:
-      lastMerged = mergedMatches[-1]
-      if mergeable(lastMerged['start'], lastMerged['end'], merged['start'], merged['end']):
-        lastMerged = mergeMatches(mergedMatches[-1], merged)
-      else:
-        mergedMatches.append(merged)
-    else:
-      mergedMatches.append(merged)
-  return mergedMatches
-
-# def makeGroupedIes(start, end, macs):
-#   return array('start' => start, 'end' => end, 'macs' => macs)
-
-def getGroupedIes(mergedMatches):
-  ies = []
-  for i in range(len(mergedMatches) - 1):
-    intersectNames = (
-      set(mergedMatches[i]['end_macs'].keys()) &
-      set(mergedMatches[i + 1]['start_macs'].keys())
-    )
-    
-    if len(intersectNames) > 0:
-      intersect = []
-      for name in intersectNames:
-        intersect.append({
-          'name': name,
-          'contig_id': mergedMatches[i]['end_macs'][name]['contig_id'],
-          'left_index': mergedMatches[i]['end_macs'][name]['index'],
-          'right_index': mergedMatches[i + 1]['start_macs'][name]['index'],
-          'left_orientation': mergedMatches[i]['end_macs'][name]['orientation'],
-          'right_orientation': mergedMatches[i + 1]['start_macs'][name]['orientation'],
-        })
-      ies.append({
-        'start': mergedMatches[i]['end'] + 1,
-        'end': mergedMatches[i + 1]['start'] - 1,
-        'macs': intersect
+    # In the rare case that a MAC contigs has multiple matches at a single
+    # MIC locus, they should be merged into a single row
+    def collapse_matches(data: pd.DataFrame):
+      data = data.sort_values("index")
+      return pd.Series({
+        "index": ",".join([str(i) for i in data["index"]]),
+        "orientation": ",".join(data["orientation"])
       })
-  return ies
 
-# function quoteVal(val) {
-#   return "'{val}'";
-# }
+    # Get the matches which flank an IES on the left
+    matches_left = match_data.drop("mic_start", axis="columns")
+    matches_left = matches_left.rename({"mic_end": "start"}, axis="columns")
+    matches_left["start"] += 1
+    matches_left = pd.merge(intervals_ies, matches_left, on="start")
+    matches_left = matches_left.groupby(["start", "end", "mac_contig_id", "mac_name"])
+    matches_left = matches_left.apply(collapse_matches)
 
-# // function getSqlIesValues(&values, &currIesId, micContig, groupedIes) {
-# //   foreach (groupedIes as ies) {
-# //     foreach (ies['macs'] as mac) {
-# //       leftIndexStr = implode(',', mac['left_index']);
-# //       rightIndexStr = implode(',', mac['right_index']);
-# //       values[] =
-# //         '(' .
-# //           quoteVal(currIesId) . ',' .
-# //           quoteVal(micContig['contig_id']) . ',' .
-# //           quoteVal(micContig['name']) . ',' .
-# //           quoteVal(ies['start']) . ',' .
-# //           quoteVal(ies['end']) . ',' .
-# //           quoteVal(ies['end'] - ies['start'] + 1) . ',' .
-# //           quoteVal(mac['contig_id']) . ',' .
-# //           quoteVal(mac['name']) . ',' .
-# //           quoteVal(leftIndexStr) . ',' .
-# //           quoteVal(rightIndexStr) .
-# //         ')';
-# //       currIesId++;
-# //     }
-# //   }
-# // }
+    # Get the matches which flank an IES on the right
+    matches_right = match_data.drop("mic_end", axis="columns")
+    matches_right = matches_right.rename({"mic_start": "end"}, axis="columns")
+    matches_right["end"] -= 1
+    matches_right = pd.merge(intervals_ies, matches_right, on="end")
+    matches_right = matches_right.groupby(["start", "end", "mac_contig_id", "mac_name"])
+    matches_right = matches_right.apply(collapse_matches)
 
-def getSqlIesValues(values, currIesId, micContig, groupedIes):
-  for ies in groupedIes:
-    for mac in ies['macs']:
-      leftIndexStr = ','.join([str(x) for x in mac['left_index']])
-      rightIndexStr = ','.join([str(x) for x in mac['right_index']])
-      leftOrientationStr = ','.join([str(x) for x in mac['left_orientation']])
-      rightOrientationStr = ','.join([str(x) for x in mac['right_orientation']])
-      values.append(
-        "(" +
-          f"'{currIesId}'" + ',' +
-          f"'{micContig['contig_id']}'" + ',' +
-          f"'{micContig['name']}'" + ',' +
-          f"'{ies['start']}'" + ',' +
-          f"'{ies['end']}'" + ',' +
-          f"'{ies['end'] - ies['start'] + 1}'" + ',' +
-          f"'{mac['contig_id']}'" + ',' +
-          f"'{mac['name']}'" + ',' +
-          f"'{leftIndexStr}'" + ',' +
-          f"'{rightIndexStr}'" + ',' +
-          f"'{leftOrientationStr}'" + ',' +
-          f"'{rightOrientationStr}'" +
-        ")"
-      )
-      currIesId += 1
-  return currIesId
+    # Get the IESs which are flanked on both the right and left
+    # by a MAC match from the same MAC contig.
+    ies_data = pd.merge(
+      matches_left,
+      matches_right,
+      how = "inner",
+      left_index = True,
+      right_index = True,
+      suffixes = ("_left", "_right")
+    )
+    ies_data = ies_data.reset_index()
+    ies_data_list.append(ies_data)
+  
+  if len(ies_data_list) > 0:
+    ies_data = pd.concat(ies_data_list, axis="index")
+    ies_data["length"] = ies_data["end"] - ies_data["start"] + 1
+    ies_data["mic_name"] = mic_name
+    ies_data["mic_contig_id"] = mic_contig_id
 
-# function test() {
-#   matches = array(
-#     makeMatch(0, 100, 'A'), 
-#     makeMatch(0, 100, 'B'), 
-#     makeMatch(0, 1000, 'C'), 
-#     makeMatch(0, 1000, 'E'),
-#     makeMatch(1002, 1004, 'E'),
-#   );
+    ies_data = ies_data.rename(
+      {
+        "start": "mic_start",
+        "end": "mic_end",
+        "index_left": "left_index",
+        "index_right": "right_index",
+        "orientation_left": "left_orientation",
+        "orientation_right": "right_orientation",
+      },
+      axis = "columns",
+    )
+    ies_data = ies_data[IES_COLUMNS]
+  else:
+    ies_data = pd.DataFrame([], columns=IES_COLUMNS)
+  return ies_data
 
-#   printf("matches:\n");
-#   var_export(matches);
-#   printf("\n");
-
-#   mergedMatches = mergeAllMatches(matches);
-
-#   printf("mergedMatches:\n");
-#   var_export(mergedMatches);
-#   printf("\n");
-
-#   groupedIes = getGroupedIes(mergedMatches);
-
-#   printf("groupedIes:\n");
-#   var_export(groupedIes);
-#   printf("\n");
-
-#   sqlIesValues = array();
-#   currIesId = 0;
-#   micContig = array(
-#     'contig_id' => 1,
-#     'name' => 'Mic_Contig_1'
-#   );
-#   getSqlIesValues(sqlIesValues, currIesId, micContig, groupedIes);
-
-#   printf("sqlIesValues:\n");
-#   var_export(sqlIesValues);
-#   printf("\n");
-# }
 
 def make_ies_table(db: str, ies_type: str):
   common_utils.log(f"{db} {ies_type}")
@@ -321,9 +245,10 @@ def make_ies_table(db: str, ies_type: str):
     raise Exception("Impossible.") 
 
   conn = mysql_utils.get_connection()
-  cursor = conn.cursor(dictionary=True)
+  cursor = conn.cursor()
 
-  micContigs = getMicContigs(cursor, db)
+  mic_contig_list = get_mic_contigs(cursor, db)
+
   comment = {
     "strict": (
       "segments on the precursor contigs that lie between 2 product matches" +
@@ -332,11 +257,12 @@ def make_ies_table(db: str, ies_type: str):
     "weak": "segments on the precursor contigs that lie between 2 product matches",
   }
 
+  cursor = conn.cursor()
   cursor.execute(f"DROP TABLE IF EXISTS `{db}`.`ies_{ies_type}`;")
   cursor.execute(
     f"""
     CREATE TABLE `{db}`.`ies_{ies_type}` (
-      `ies_id` int NOT NULL COMMENT 'primary key for the table',
+      `ies_id` int NOT NULL AUTO_INCREMENT COMMENT 'primary key for the table',
       `mic_contig_id` int NOT NULL COMMENT 'primary key of the `contig` table for the corresponding precursor sequence',
       `mic_name` varchar(50) NOT NULL COMMENT 'MIC contig name',
       `mic_start` int NOT NULL COMMENT 'position of the first base pair of the precursor segment of the match on the corresponding precursor sequence',
@@ -354,41 +280,44 @@ def make_ies_table(db: str, ies_type: str):
     ) COMMENT '{comment[ies_type]}';
     """
   )
-  values = []
-  currIesId = 1
-  for i in range(len(micContigs)):
-    micContig = micContigs[i]
-    matches = getMacMatches(cursor, db, micContig["contig_id"])
-
-    if ies_type == "weak":
-      # separate out by MAC and then calculate IES
-      matchesByMac = groupMatchesByMac(matches)
-      groupedIes = []
-      for singleMacMatches in matchesByMac:
-        singleMacMergedMatches = mergeAllMatches(singleMacMatches)
-        singleMacGroupedIes = getGroupedIes(singleMacMergedMatches)
-        for ies in singleMacGroupedIes:
-          groupedIes.append(ies)
-    elif ies_type == "strict":
-      # pool all MAC matches together so that there are no overlapping IES/MDS between different MAC contigs
-      mergedMatches = mergeAllMatches(matches)
-      groupedIes = getGroupedIes(mergedMatches)
-    else:
-      raise Exception("Impossible.")
-
-    currIesId = getSqlIesValues(values, currIesId, micContig, groupedIes);
+  sql_columns = ", ".join(f"`{x}`" for x in IES_COLUMNS)
+  ies_data_list = []
+  for mic_num, mic_contig in enumerate(mic_contig_list.to_records(), 1):
+    ies_data_list.append(
+      get_mic_ies(
+        cursor,
+        db,
+        ies_type,
+        mic_contig["name"],
+        mic_contig["contig_id"],
+      )
+    )
     
-    # every 100 contigs write to SQL
-    if ((i + 1) % 100 == 0) or (i == len(micContigs)):
-      common_utils.log(f"{i} / {len(micContigs)}")
-      insertQuery = f"INSERT INTO `{db}`.`ies_{ies_type}` VALUES " + ', '.join(values) + ";"
-      values = []
-      cursor.execute(insertQuery)
+    if ((mic_num % BATCH_SIZE_CONTIGS) == 0) or (mic_num == len(mic_contig_list)):
+      common_utils.log(f"{mic_num} / {len(mic_contig_list)}")
+      ies_data = pd.concat(ies_data_list, axis="index")
+      ies_data_list = []
+      values = mysql_utils.make_sql_values(ies_data[IES_COLUMNS])
+      cursor.execute(
+        f"""
+        INSERT INTO `{db}`.`ies_{ies_type}`
+        ({sql_columns})
+        VALUES {values};"
+        """
+      )
+      cursor.close()
+      conn.close()
+      conn = mysql_utils.get_connection()
+      cursor = conn.cursor()
 
   cursor.close()
   conn.close()
 
-if __name__ == "__main__":
-  make_ies_table("hello_world", "strict")
+# make_ies_table("hello_world", "strict")
+# make_ies_table("hello_world", "weak")
 
-# TEST THE WEAK AND CLEEEEEAAAAAAN THIS STUFF UP!!!
+# conn = mysql_utils.get_connection()
+# ies = get_mic_ies_strict(conn, "hello_world", "OXYTRI_MIC_67642", 26284)
+# print("hi")
+  # mic_name = "OXYTRI_MIC_67642"
+  # mic_contig_id = 26284
