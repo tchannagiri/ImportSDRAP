@@ -11,6 +11,8 @@ import constants
 import common_utils
 import interval_utils
 import mysql_utils
+import create_gene
+import create_ies
 
 def create_database(db: str):
   common_utils.log(f"create_database {db}")
@@ -22,22 +24,22 @@ def create_database(db: str):
   conn.close()
 
 def create_name_temp_table(
-  to_db: str,
-  from_db: str,
+  db_to: str,
+  db_from: str,
   mac_name_regex: str,
   mic_name_regex: str,
 ):
   common_utils.log(
-    f"create_name_temp_table {to_db} {from_db}" +
+    f"create_name_temp_table {db_to} {db_from}" +
     f" {mac_name_regex} {mic_name_regex}"
   )
 
   conn = mysql_utils.get_connection()
   cursor = conn.cursor()
-  cursor.execute(f"DROP TABLE IF EXISTS `{to_db}`.`name_temp`;")
+  cursor.execute(f"DROP TABLE IF EXISTS `{db_to}`.`name_temp`;")
   cursor.execute(
     f"""
-    CREATE TABLE `{to_db}`.`name_temp` (
+    CREATE TABLE `{db_to}`.`name_temp` (
       `contig_id` INT NOT NULL,
       `name` VARCHAR(50) NOT NULL,
       PRIMARY KEY (`contig_id`),
@@ -48,7 +50,7 @@ def create_name_temp_table(
 
   cursor.execute(
     f"""
-    INSERT INTO `{to_db}`.`name_temp`
+    INSERT INTO `{db_to}`.`name_temp`
     (
       `contig_id`,
       `name`
@@ -56,7 +58,7 @@ def create_name_temp_table(
     SELECT
       `nuc_id`,
       `alias`
-    FROM `{from_db}`.`alias`
+    FROM `{db_from}`.`alias`
     WHERE `alias` REGEXP '{mac_name_regex}'
     OR `alias` REGEXP '{mic_name_regex}';"
     """
@@ -65,15 +67,15 @@ def create_name_temp_table(
   cursor.close()
   conn.close()
 
-def create_contig_table(to_db: str, from_db: str):
-  common_utils.log(f"make_contig_table {to_db} {from_db}")
+def create_contig_table(db_to: str, db_from: str):
+  common_utils.log(f"make_contig_table {db_to} {db_from}")
 
   conn = mysql_utils.get_connection()
   cursor = conn.cursor()
-  cursor.execute(f"DROP TABLE IF EXISTS `{to_db}`.`contig`;")
+  cursor.execute(f"DROP TABLE IF EXISTS `{db_to}`.`contig`;")
   cursor.execute(
     f"""
-    CREATE TABLE `{to_db}`.`contig` (
+    CREATE TABLE `{db_to}`.`contig` (
       `contig_id` INT NOT NULL COMMENT 'Index of the `contig` table',
       `nucleus` ENUM('mac','mic') NOT NULL COMMENT 'Type of nucleus',
       `name` VARCHAR(50) NOT NULL COMMENT 'Contig name',
@@ -92,7 +94,7 @@ def create_contig_table(to_db: str, from_db: str):
   
   cursor.execute(
     f"""
-    INSERT INTO `{to_db}`.`contig`
+    INSERT INTO `{db_to}`.`contig`
     (
       `contig_id`,
       `nucleus`,
@@ -123,106 +125,27 @@ def create_contig_table(to_db: str, from_db: str):
       IF(`T`.`three_length` = 0 OR `T`.`three_length` IS NULL, 0, `T`.`three_start`) AS `telomere_three_start`,
       IF(`T`.`three_length` = 0 OR `T`.`three_length` IS NULL, 0, `T`.`three_start` + `T`.`three_length` - 1) AS `telomere_three_end`,
       UPPER(`N`.`sequence`) AS `sequence`
-    FROM `{from_db}`.`nucleotide` AS `N`
-    LEFT JOIN `{to_db}`.`name_temp` AS `A`
+    FROM `{db_from}`.`nucleotide` AS `N`
+    LEFT JOIN `{db_to}`.`name_temp` AS `A`
       ON `N`.`nuc_id` = `A`.`contig_id`
-    LEFT JOIN `{from_db}`.`feature` AS `F`
+    LEFT JOIN `{db_from}`.`feature` AS `F`
       ON `N`.`feat_id` = `F`.`feat_id`
-    LEFT JOIN `{from_db}`.`telomere` AS `T`
+    LEFT JOIN `{db_from}`.`telomere` AS `T`
       ON `N`.`nuc_id` = `T`.`nuc_id`;
     """
   )
   cursor.close()
   conn.close()
 
-def create_alias_table(
-  to_db: str,
-  from_db: str,
-  alias_file_list: list[str],
-):
-  common_utils.log(f"create_alias {to_db} {from_db} {alias_file_list}")
-
-  conn = mysql_utils.get_connection()
-  cursor = conn.cursor(dictionary=True)
-  cursor.execute(f"SELECT * FROM `{from_db}`.`alias`;")
-  alias_from = cursor.fetchall()
-  alias_from = pd.DataFrame.from_records(alias_from)
-
-  cursor.execute(f"DROP TABLE IF EXISTS `{to_db}`.`alias`;")
-  cursor.execute(
-    f"""
-    CREATE TABLE `{to_db}`.`alias` (
-      `alias_id` INT NOT NULL AUTO_INCREMENT COMMENT 'primary key for the table',
-      `id` INT NOT NULL COMMENT 'primary key of the table for the corresponding sequence',
-      `name` VARCHAR(50) NOT NULL COMMENT 'the primary name of the sequence',
-      `alias` VARCHAR(50) NOT NULL COMMENT 'alias of the sequence',
-      `table` VARCHAR(50) NOT NULL COMMENT 'the table that `id` refers to',
-      `type` VARCHAR(50) DEFAULT NULL COMMENT 'the type of alias',
-      PRIMARY KEY (`alias_id`),
-      KEY `name` (`name`),
-      KEY `alias` (`alias`)
-    ) COMMENT='table of sequence aliases';
-    """
-  )
-
-  for alias_file in alias_file_list:
-    common_utils.log(alias_file)
-    alias_to = pd.read_csv(alias_file)
-    alias_to = alias_to.merge(
-      alias_from[["nuc_id", "alias"]],
-      left_on = "primary",
-      right_on = "alias",
-      how = "inner",
-    )
-    alias_to = alias_to.drop("alias", axis="columns")
-    alias_to = alias_to.melt(
-      id_vars = ["nuc_id", "primary"],
-      var_name = "type",
-      value_name = "alias",
-    )
-    alias_to = alias_to.dropna(axis='index')
-    alias_to = alias_to.rename({"nuc_id": "id", "primary": "name"}, axis="columns")
-    alias_to["table"] = "contig"
-    mysql_utils.upload_in_chunks(
-      alias_to,
-      ["id", "name", "alias", "table", "type"],
-      cursor,
-      to_db,
-      "alias",
-      constants.SQL_BATCH_UPLOAD_ROWS,
-    )
-    # for i in range(0, alias_to.shape[0], SQL_BATCH_UPLOAD_ROWS):
-    #   common_utils.log(f"{i} / {alias_to.shape[0]}")
-    #   values = mysql_utils.make_sql_values(
-    #     alias_to.loc[
-    #       i : (i + SQL_BATCH_UPLOAD_ROWS - 1),
-    #       ["id", "name", "alias", "table", "type"]
-    #     ])
-    #   cursor.execute(
-    #     f"""
-    #     INSERT INTO `{to_db}`.`alias`
-    #     (
-    #       `id`,
-    #       `name`,
-    #       `alias`,
-    #       `table`,
-    #       `type`
-    #     )
-    #     VALUES {values};
-    #     """
-    #   )
-  cursor.close()
-  conn.close()
-
-def create_match_table(to_db: str, from_db: str):
-  common_utils.log(f"create_match_table {to_db} {from_db}")
+def create_match_table(db_to: str, db_from: str):
+  common_utils.log(f"create_match_table {db_to} {db_from}")
 
   conn = mysql_utils.get_connection()
   cursor = conn.cursor()
-  cursor.execute(f"DROP TABLE IF EXISTS `{to_db}`.`match`;")
+  cursor.execute(f"DROP TABLE IF EXISTS `{db_to}`.`match`;")
   cursor.execute(
     f"""
-    CREATE TABLE `{to_db}`.`match` (
+    CREATE TABLE `{db_to}`.`match` (
       `match_id` INT NOT NULL COMMENT 'primary key for the table',
       `mac_contig_id` INT NOT NULL COMMENT 'primary key of the `contig` table for the corresponding precursor sequence',
       `mac_name` VARCHAR(50) NOT NULL COMMENT 'MAC contig name',
@@ -249,7 +172,7 @@ def create_match_table(to_db: str, from_db: str):
 
   cursor.execute(
     f"""
-    INSERT INTO `{to_db}`.`match`
+    INSERT INTO `{db_to}`.`match`
     (
       `match_id`,
       `mac_contig_id`,
@@ -287,25 +210,25 @@ def create_match_table(to_db: str, from_db: str):
       `M`.`is_preliminary`,
       `M`.`is_additional`,
       `M`.`is_fragment`
-    FROM `{from_db}`.`match` AS `M`
-    LEFT JOIN `{to_db}`.`contig` AS `NMIC`
+    FROM `{db_from}`.`match` AS `M`
+    LEFT JOIN `{db_to}`.`contig` AS `NMIC`
       ON `M`.`prec_nuc_id` = `NMIC`.`contig_id`
-    LEFT JOIN `{to_db}`.`contig` AS `NMAC`
+    LEFT JOIN `{db_to}`.`contig` AS `NMAC`
       ON `M`.`prod_nuc_id` = `NMAC`.`contig_id`;
     """
   )
   cursor.close()
   conn.close()
 
-def create_pointer_table(to_db: str, from_db: str):
-  common_utils.log(f"create_pointer_table {to_db} {from_db}")
+def create_pointer_table(db_to: str, db_from: str):
+  common_utils.log(f"create_pointer_table {db_to} {db_from}")
   
   conn = mysql_utils.get_connection()
   cursor = conn.cursor()
-  cursor.execute(f"DROP TABLE IF EXISTS `{to_db}`.`pointer`;")
+  cursor.execute(f"DROP TABLE IF EXISTS `{db_to}`.`pointer`;")
   cursor.execute(
     f"""
-    CREATE TABLE `{to_db}`.`pointer` (
+    CREATE TABLE `{db_to}`.`pointer` (
       `ptr_id` INT NOT NULL COMMENT 'primary key for the table',
       `mic_contig_id` INT NOT NULL COMMENT 'primary key of the `contig` table for the corresponding precursor sequence',
       `mic_name` VARCHAR(50) NOT NULL COMMENT 'MIC contig name',
@@ -334,7 +257,7 @@ def create_pointer_table(to_db: str, from_db: str):
 
   cursor.execute(
     f"""
-    INSERT INTO `{to_db}`.`pointer`
+    INSERT INTO `{db_to}`.`pointer`
     (
       `ptr_id`,
       `mic_contig_id`,
@@ -376,29 +299,29 @@ def create_pointer_table(to_db: str, from_db: str):
       `P`.`right_match_orientation`,
       `P`.`length`,
       `P`.`is_preliminary`
-    FROM `{from_db}`.`pointer` AS `P`
-    LEFT JOIN `{to_db}`.`contig` AS `NMIC`
+    FROM `{db_from}`.`pointer` AS `P`
+    LEFT JOIN `{db_to}`.`contig` AS `NMIC`
       ON `P`.`prec_nuc_id` = `NMIC`.`contig_id`
-    LEFT JOIN `{to_db}`.`contig` AS `NMAC`
+    LEFT JOIN `{db_to}`.`contig` AS `NMAC`
       ON `P`.`prod_nuc_id` = `NMAC`.`contig_id`
-    LEFT JOIN `{to_db}`.`match` AS `MLEFT`
+    LEFT JOIN `{db_to}`.`match` AS `MLEFT`
       ON `P`.`left_match_id` = `MLEFT`.`match_id`
-    LEFT JOIN `{to_db}`.`match` AS `MRIGHT`
+    LEFT JOIN `{db_to}`.`match` AS `MRIGHT`
       ON `P`.`right_match_id` = `MRIGHT`.`match_id`;
     """
   )
 
 def create_properties_table(
-  to_db: str,
-  from_db: str,
+  db_to: str,
+  db_from: str,
 ):
-  common_utils.log(f"create_properties_table {to_db} {from_db}")
+  common_utils.log(f"create_properties_table {db_to} {db_from}")
   conn = mysql_utils.get_connection()
   cursor = conn.cursor()
-  cursor.execute(f"DROP TABLE IF EXISTS `{to_db}`.`properties`;")
+  cursor.execute(f"DROP TABLE IF EXISTS `{db_to}`.`properties`;")
   cursor.execute(
     f"""
-    CREATE TABLE `{to_db}`.`properties` (
+    CREATE TABLE `{db_to}`.`properties` (
       `prop_id` INT NOT NULL COMMENT 'primary key of the table',
       `mic_contig_id` INT NOT NULL COMMENT 'primary key of the `contig` table for the corresponding precursor sequence',
       `mic_name` VARCHAR(50) NOT NULL COMMENT 'MIC contig name',
@@ -427,7 +350,7 @@ def create_properties_table(
 
   cursor.execute(
     f"""
-    INSERT INTO `{to_db}`.`properties`
+    INSERT INTO `{db_to}`.`properties`
     (
       `prop_id`,
       `mic_contig_id`,
@@ -469,25 +392,25 @@ def create_properties_table(
       `P`.`strongly_ordered`,
       `P`.`weakly_non_scrambled`,
       `P`.`strongly_non_scrambled`
-    FROM `{from_db}`.`properties` AS `P`
-    LEFT JOIN `{to_db}`.`contig` AS `NMIC`
+    FROM `{db_from}`.`properties` AS `P`
+    LEFT JOIN `{db_to}`.`contig` AS `NMIC`
       ON `P`.`prec_nuc_id` = `NMIC`.`contig_id`
-    LEFT JOIN `{to_db}`.`contig` AS `NMAC`
+    LEFT JOIN `{db_to}`.`contig` AS `NMAC`
       ON `P`.`prod_nuc_id` = `NMAC`.`contig_id`;
     """
   )
 
 
-def create_parameter_table(to_db: str, from_db: str):
-  common_utils.log(f"create_parameter_table {to_db} {from_db}")
+def create_parameter_table(db_to: str, db_from: str):
+  common_utils.log(f"create_parameter_table {db_to} {db_from}")
 
   conn = mysql_utils.get_connection()
   cursor = conn.cursor()
 
-  cursor.execute(f"DROP TABLE IF EXISTS `{to_db}`.`parameter`;")
+  cursor.execute(f"DROP TABLE IF EXISTS `{db_to}`.`parameter`;")
   cursor.execute(
     f"""
-    CREATE TABLE `{to_db}`.`parameter` (
+    CREATE TABLE `{db_to}`.`parameter` (
       `parameter_id` INT NOT NULL COMMENT 'primary key for the table',
       `date` TEXT COMMENT 'date of running the pipeline with specified parameter values',
       `database` TEXT COMMENT 'name of the mysql database',
@@ -531,17 +454,17 @@ def create_parameter_table(to_db: str, from_db: str):
     ) COMMENT='table of user defined parameters used when running the pipeline';
     """
   )
-  cursor.execute(f"INSERT INTO `{to_db}`.`parameter` SELECT * from `{from_db}`.`parameter`;")
+  cursor.execute(f"INSERT INTO `{db_to}`.`parameter` SELECT * from `{db_from}`.`parameter`;")
 
-def create_coverage_table(to_db: str, from_db: str):
-  common_utils.log(f"create_coverage_table {to_db} {from_db}")
+def create_coverage_table(db_to: str, db_from: str):
+  common_utils.log(f"create_coverage_table {db_to} {db_from}")
 
   conn = mysql_utils.get_connection()
   cursor = conn.cursor()
-  cursor.execute(f"DROP TABLE IF EXISTS `{to_db}`.`coverage`;")
+  cursor.execute(f"DROP TABLE IF EXISTS `{db_to}`.`coverage`;")
   cursor.execute(
     f"""
-    CREATE TABLE `{to_db}`.`coverage` (
+    CREATE TABLE `{db_to}`.`coverage` (
       `cov_id` INT NOT NULL COMMENT 'primary key for the table',
       `mic_contig_id` INT NOT NULL COMMENT 'primary key of the `contig` table for the MIC contig',
       `mic_name` VARCHAR(50) NOT NULL COMMENT 'MIC contig name',
@@ -563,7 +486,7 @@ def create_coverage_table(to_db: str, from_db: str):
     """
   )
 
-  cursor.execute(f"SELECT MAX(`mac_contig_id`) AS `max` FROM `{to_db}`.`properties`;")
+  cursor.execute(f"SELECT MAX(`mac_contig_id`) AS `max` FROM `{db_to}`.`properties`;")
   mac_id_max = cursor.fetchall()[0][0]
   mac_id_batch_size = 100 # How many mac contigs to process at a time
   cov_id = 1 # Current coverage id
@@ -583,7 +506,7 @@ def create_coverage_table(to_db: str, from_db: str):
         `contig_id`,
         `non_tel_length`
       FROM
-        `{to_db}`.`contig`
+        `{db_to}`.`contig`
       WHERE
         `contig_id` BETWEEN {mac_id_batch_start} AND {mac_id_batch_end};
       """
@@ -603,7 +526,7 @@ def create_coverage_table(to_db: str, from_db: str):
         `mic_start`,
         `mic_end`
       FROM
-        `{to_db}`.`match`
+        `{db_to}`.`match`
       WHERE
         `mac_contig_id` BETWEEN {mac_id_batch_start} AND {mac_id_batch_end} 
       AND
@@ -674,7 +597,7 @@ def create_coverage_table(to_db: str, from_db: str):
 
     cursor.execute(
       f"""
-      INSERT INTO `{to_db}`.`coverage`
+      INSERT INTO `{db_to}`.`coverage`
       (
         `cov_id`,
         `mic_contig_id`,
@@ -709,11 +632,11 @@ def create_coverage_table(to_db: str, from_db: str):
       FROM
         ({sql_table_rows}) AS `T`
       LEFT JOIN
-        `{to_db}`.`contig` AS `NMAC`
+        `{db_to}`.`contig` AS `NMAC`
       ON
         `T`.`mac_contig_id` = `NMAC`.`contig_id`
       LEFT JOIN
-        `{to_db}`.`contig` AS `NMIC`
+        `{db_to}`.`contig` AS `NMIC`
       ON
         `T`.`mic_contig_id` = `NMIC`.`contig_id`;"
       """
@@ -721,16 +644,16 @@ def create_coverage_table(to_db: str, from_db: str):
   cursor.close()
   conn.close()
 
-def create_count_table(to_db: str, from_db: str):
-  common_utils.log(f"create_count_table {to_db} {from_db}")
+def create_count_table(db_to: str, db_from: str):
+  common_utils.log(f"create_count_table {db_to} {db_from}")
 
   conn = mysql_utils.get_connection()
   cursor = conn.cursor()
 
-  cursor.execute(f"DROP TABLE IF EXISTS `{to_db}`.`count`;")
+  cursor.execute(f"DROP TABLE IF EXISTS `{db_to}`.`count`;")
   cursor.execute(
     f"""
-    CREATE TABLE `{to_db}`.`count` (
+    CREATE TABLE `{db_to}`.`count` (
       `contig_id` INT NOT NULL COMMENT 'primary key of the `contig` table for the corresponding contig',
       `name` VARCHAR(50) NOT NULL COMMENT 'contig name',
       `gene_num` INT NOT NULL COMMENT 'Number of genes on this contig',
@@ -760,7 +683,7 @@ def create_count_table(to_db: str, from_db: str):
   cursor.execute(
     f"""
     INSERT INTO
-      `{to_db}`.`count`
+      `{db_to}`.`count`
       (
         `contig_id`,
         `name`,
@@ -805,7 +728,7 @@ def create_count_table(to_db: str, from_db: str):
       0,
       0
     FROM
-      `{to_db}`.`contig`;
+      `{db_to}`.`contig`;
     """
   )
 
@@ -813,12 +736,12 @@ def create_count_table(to_db: str, from_db: str):
   cursor.execute(
     f"""
     UPDATE
-      `{to_db}`.`count` AS `C`,
+      `{db_to}`.`count` AS `C`,
       (
         SELECT
           `contig_id` AS `contig_id`,
           COUNT(*) AS `num`
-        FROM `{to_db}`.`gene`
+        FROM `{db_to}`.`gene`
         WHERE `type` = 'gene'
         GROUP BY `contig_id`
       ) AS `G`
@@ -858,12 +781,12 @@ def create_count_table(to_db: str, from_db: str):
       cursor.execute(
         f"""
         UPDATE
-          `{to_db}`.`count` AS `C`,
+          `{db_to}`.`count` AS `C`,
           (
             SELECT
               `{a_nuc}_contig_id` AS `contig_id`,
               COUNT(*) AS `num`
-            FROM `{to_db}`.`{table}`
+            FROM `{db_to}`.`{table}`
             WHERE {where}
             GROUP BY `{a_nuc}_contig_id`
           ) AS `T`
@@ -876,13 +799,13 @@ def create_count_table(to_db: str, from_db: str):
     cursor.execute(
       f"""
       UPDATE
-        `{to_db}`.`count` AS `C`,
+        `{db_to}`.`count` AS `C`,
         (
           SELECT 
             `{a_nuc}_contig_id` AS `contig_id`,
             COUNT(DISTINCT `{b_nuc}_contig_id`) AS `num`
           FROM
-            `{to_db}`.`match`
+            `{db_to}`.`match`
           WHERE
             `is_preliminary` = '1'
           GROUP BY
@@ -899,7 +822,7 @@ def create_count_table(to_db: str, from_db: str):
     cursor.execute(
       f"""
       UPDATE
-        `{to_db}`.`count` AS `C`,
+        `{db_to}`.`count` AS `C`,
         (
           SELECT
             `{a_nuc}_contig_id` as `contig_id`,
@@ -917,7 +840,7 @@ def create_count_table(to_db: str, from_db: str):
             SUM(`weakly_non_scrambled`) AS `weakly_non_scrambled_num`,
             SUM(`strongly_non_scrambled`) AS `strongly_non_scrambled_num`
           FROM
-            `{to_db}`.`properties`
+            `{db_to}`.`properties`
           GROUP BY
             `{a_nuc}_contig_id` 
         ) AS `P`
@@ -943,16 +866,16 @@ def create_count_table(to_db: str, from_db: str):
   cursor.close()
   conn.close()
 
-def create_alias_table(to_db: str):
-  common_utils.log(f"create_alias_table {to_db}")
+def create_alias_table(db_to: str):
+  common_utils.log(f"create_alias_table {db_to}")
 
   conn = mysql_utils.get_connection()
   cursor = conn.cursor()
 
-  cursor.execute(f"DROP TABLE IF EXISTS `{to_db}`.`alias`;")
+  cursor.execute(f"DROP TABLE IF EXISTS `{db_to}`.`alias`;")
   cursor.execute(
     f"""
-    CREATE TABLE `{to_db}`.`alias` (
+    CREATE TABLE `{db_to}`.`alias` (
       `alias_id` INT NOT NULL AUTO_INCREMENT COMMENT 'primary key for the table',
       `id` INT NOT NULL COMMENT 'primary key of the table for the corresponding sequence',
       `name` VARCHAR(50) NOT NULL COMMENT 'the primary name of the sequence',
@@ -968,15 +891,15 @@ def create_alias_table(to_db: str):
   cursor.close()
   conn.close()
 
-def insert_alias_gene(to_db: str):
-  common_utils.log(f"insert_alias_gene {to_db}")
+def insert_alias_gene(db_to: str):
+  common_utils.log(f"insert_alias_gene {db_to}")
 
   conn = mysql_utils.get_connection()
   cursor = conn.cursor()
 
   cursor.execute(
     f"""
-    INSERT INTO `{to_db}`.`alias`
+    INSERT INTO `{db_to}`.`alias`
     (
       `id`,
       `name`,
@@ -990,7 +913,7 @@ def insert_alias_gene(to_db: str):
       `G`.`attr_id` AS `alias`,
       'gene' AS `table`,
       'primary' AS `type`
-    FROM `{to_db}`.`gene` AS `G`
+    FROM `{db_to}`.`gene` AS `G`
     WHERE `G`.`type` = 'gene';
     """
   )
@@ -998,15 +921,15 @@ def insert_alias_gene(to_db: str):
   cursor.close()
   conn.close()
 
-def insert_alias_contig(to_db: str):
-  common_utils.log(f"insert_alias_contig {to_db}")
+def insert_alias_contig(db_to: str):
+  common_utils.log(f"insert_alias_contig {db_to}")
 
   conn = mysql_utils.get_connection()
   cursor = conn.cursor()
 
   cursor.execute(
     f"""
-    INSERT INTO `{to_db}`.`alias`
+    INSERT INTO `{db_to}`.`alias`
     (
       `id`,
       `name`,
@@ -1020,23 +943,23 @@ def insert_alias_contig(to_db: str):
       `C`.`name` AS `name`,
       'contig' AS `table`,
       'primary' AS `type`
-    FROM `{to_db}`.`contig` AS `C`;
+    FROM `{db_to}`.`contig` AS `C`;
     """
   )
   cursor.close()
   conn.close()
 
 
-def insert_alias_file(to_db: str, file: str, table: str, nucleus: str):
-  common_utils.log(f"insert_alias_file {to_db} {file} {table} {nucleus}")
+def insert_alias_file(db_to: str, file: str, table: str, nucleus: str):
+  common_utils.log(f"insert_alias_file {db_to} {file} {table} {nucleus}")
   
   conn = mysql_utils.get_connection()
   cursor = conn.cursor()
 
-  cursor.execute(f"DROP TABLE IF EXISTS `{to_db}`.`alias_temp`;");
+  cursor.execute(f"DROP TABLE IF EXISTS `{db_to}`.`alias_temp`;");
   cursor.execute(
     f"""
-    CREATE TABLE `{to_db}`.`alias_temp` (
+    CREATE TABLE `{db_to}`.`alias_temp` (
       `name` VARCHAR(50),
       `alias` VARCHAR(50),
       `type` VARCHAR(50),
@@ -1057,7 +980,7 @@ def insert_alias_file(to_db: str, file: str, table: str, nucleus: str):
     alias_data,
     ["name", "alias", "type"],
     cursor,
-    to_db,
+    db_to,
     "alias_temp",
     constants.SQL_BATCH_UPLOAD_ROWS,
   )
@@ -1074,7 +997,7 @@ def insert_alias_file(to_db: str, file: str, table: str, nucleus: str):
   cursor.execute(
     f"""
     INSERT INTO
-      `{to_db}`.`alias`
+      `{db_to}`.`alias`
       (
         `id`,
         `name`,
@@ -1088,8 +1011,8 @@ def insert_alias_file(to_db: str, file: str, table: str, nucleus: str):
         `U`.`alias`,
         '{table}',
         `U`.`type`
-      FROM `{to_db}`.`alias_temp` AS `U`
-      INNER JOIN `{to_db}`.`{table}` AS `T`
+      FROM `{db_to}`.`alias_temp` AS `U`
+      INNER JOIN `{db_to}`.`{table}` AS `T`
       ON `T`.`{name_column}` = `U`.`name`
       AND `T`.`{nucleus_column}` = '{nucleus}';
     """
@@ -1099,16 +1022,16 @@ def insert_alias_file(to_db: str, file: str, table: str, nucleus: str):
   conn.close()
 
 
-def create_variant_table(to_db: str):
-  common_utils.log(f"create_variant_table {to_db}")
+def create_variant_table(db_to: str):
+  common_utils.log(f"create_variant_table {db_to}")
 
   conn = mysql_utils.get_connection()
   cursor = conn.cursor()
 
-  cursor.execute(f"DROP TABLE IF EXISTS `{to_db}`.`variant`;")
+  cursor.execute(f"DROP TABLE IF EXISTS `{db_to}`.`variant`;")
   cursor.execute(
     f"""
-    CREATE TABLE `{to_db}`.`variant` (
+    CREATE TABLE `{db_to}`.`variant` (
       `contig_id` INT NOT NULL AUTO_INCREMENT COMMENT 'primary key for the table',
       `name` VARCHAR(50) NOT NULL COMMENT 'the primary name of the sequence',
       `variant` VARCHAR(500) NOT NULL COMMENT 'variants/isoforms of the sequence',
@@ -1117,16 +1040,16 @@ def create_variant_table(to_db: str):
     """
   )
 
-def insert_variant_file(to_db: str, file: str):
-  common_utils.log(f"insert_variant_file {to_db} {file}")
+def insert_variant_file(db_to: str, file: str):
+  common_utils.log(f"insert_variant_file {db_to} {file}")
 
   conn = mysql_utils.get_connection()
   cursor = conn.cursor()
 
-  cursor.execute(f"DROP TABLE IF EXISTS `{to_db}`.`variant_temp`;")
+  cursor.execute(f"DROP TABLE IF EXISTS `{db_to}`.`variant_temp`;")
   cursor.execute(
     f"""
-    CREATE TABLE `{to_db}`.`variant_temp` (
+    CREATE TABLE `{db_to}`.`variant_temp` (
       `name` VARCHAR(50),
       `variant` VARCHAR(500),
       KEY (`name`)
@@ -1139,7 +1062,7 @@ def insert_variant_file(to_db: str, file: str):
     variant_data,
     ["name", "variant"],
     cursor,
-    to_db,
+    db_to,
     "variant_temp",
     constants.SQL_BATCH_UPLOAD_ROWS,
   )
@@ -1147,7 +1070,7 @@ def insert_variant_file(to_db: str, file: str):
   cursor.execute(
     f"""
     INSERT INTO
-      `{to_db}`.`variant`
+      `{db_to}`.`variant`
       (
         `contig_id`,
         `name`,
@@ -1157,8 +1080,8 @@ def insert_variant_file(to_db: str, file: str):
         `C`.`contig_id`,
         `C`.`name`,
         `V`.`variant`
-      FROM `{to_db}`.`variant_temp` AS `V`
-      INNER JOIN `{to_db}`.`contig` AS `C`
+      FROM `{db_to}`.`variant_temp` AS `V`
+      INNER JOIN `{db_to}`.`contig` AS `C`
       ON `V`.`name` = `C`.`name`;
     """
   )
@@ -1167,16 +1090,16 @@ def insert_variant_file(to_db: str, file: str):
   conn.close()
 
 
-def create_stats_table(to_db: str):
-  common_utils.log(f"create_stats_table {to_db}")
+def create_stats_table(db_to: str):
+  common_utils.log(f"create_stats_table {db_to}")
 
   conn = mysql_utils.get_connection()
   cursor = conn.cursor(dictionary=True)
 
-  cursor.execute(f"DROP TABLE IF EXISTS `{to_db}`.`stats`;")
+  cursor.execute(f"DROP TABLE IF EXISTS `{db_to}`.`stats`;")
   cursor.execute(
     f"""
-    CREATE TABLE `{to_db}`.`stats` (
+    CREATE TABLE `{db_to}`.`stats` (
       `stats_id` INT NOT NULL AUTO_INCREMENT COMMENT 'Primary key for the table',
       `contig_mac_two_telomere` INT NOT NULL COMMENT 'Number of 2-telomere MAC contigs in the database',
       `contig_mac_one_telomere` INT NOT NULL COMMENT 'Number of 1-telomere MAC contigs in the database',
@@ -1223,7 +1146,7 @@ def create_stats_table(to_db: str):
         SUM( ( ( `telomere_five_start` > 0 ) + ( `telomere_three_start` > 0 ) ) = 1 ) AS `one_telomere`,
         SUM( ( ( `telomere_five_start` > 0 ) + ( `telomere_three_start` > 0 ) ) = 0 ) AS `zero_telomere`,
         COUNT(*) AS `total`
-      FROM `{to_db}`.`contig`
+      FROM `{db_to}`.`contig`
       WHERE `nucleus` = '{nucleus}';
       """
     )
@@ -1238,8 +1161,8 @@ def create_stats_table(to_db: str):
       f"""
       SELECT
         COUNT(*) AS `total`
-      FROM `{to_db}`.`gene` AS `G`
-      INNER JOIN `{to_db}`.`contig` AS `C`
+      FROM `{db_to}`.`gene` AS `G`
+      INNER JOIN `{db_to}`.`contig` AS `C`
         ON `C`.`contig_id` = `G`.`contig_id`
       WHERE `G`.`type` = 'gene'
       AND `C`.`nucleus` = '{nucleus}';
@@ -1253,7 +1176,7 @@ def create_stats_table(to_db: str):
       f"""
       SELECT
         COUNT(*) AS `total`
-      FROM `{to_db}`.`match`
+      FROM `{db_to}`.`match`
         WHERE `is_preliminary` = 1;
       """
     )
@@ -1266,7 +1189,7 @@ def create_stats_table(to_db: str):
         f"""
         SELECT
           COUNT(*) AS `total`
-        FROM `{to_db}`.`ies_strict`;
+        FROM `{db_to}`.`ies_strict`;
         """
       )
       result = cursor.fetchall()[0]
@@ -1281,7 +1204,7 @@ def create_stats_table(to_db: str):
       f"""
       SELECT
         COUNT(*) AS `total`
-      FROM `{to_db}`.`pointer`;
+      FROM `{db_to}`.`pointer`;
       """
     )
     result = cursor.fetchall()[0]
@@ -1307,7 +1230,7 @@ def create_stats_table(to_db: str):
       SUM(`weakly_non_scrambled`) AS `weakly_non_scrambled`,
       SUM(`strongly_non_scrambled`) AS `strongly_non_scrambled`,
       COUNT(*) AS `total`
-    FROM `{to_db}`.`properties`;
+    FROM `{db_to}`.`properties`;
     """
   )
   result = cursor.fetchall()[0]
@@ -1331,7 +1254,7 @@ def create_stats_table(to_db: str):
   # insert values
   cursor.execute(
     f"""
-    INSERT INTO `{to_db}`.`stats` {fields}
+    INSERT INTO `{db_to}`.`stats` {fields}
     VALUES {values};
     """
   )
@@ -1514,97 +1437,141 @@ def dump_table(
 
   common_utils.write_tsv(data, file)
 
+def dump_table_all(db: str):
+  for table in constants.TABLE_DUMP_LIST:
+    dump_table(
+      db,
+      table,
+      os.path.join(constants.DATA_DIR, db, f"{table}.tsv"),
+    )
 
-# # #track name="prec_eliminated_sequences" description="intervals comprising complement of the precursor segments labelled comp_[left-flanking-segment-prod-id]_[left-flanking-segment-index]_[right-flanking-segment-prod-id]_[right-flanking-segment-index]" itemRgb-"On"
-# # OXYTRI_MIC_33550	1	8703	none_0_Contig4386.0_-1	0	+	1	8703	255,0,153
-# # sdrap_oxy_mac2012_100720_prec_eliminated_sequences.bed
-# def make_ie_bed(to_db: str, from_db: str, ies_type: str):
-#   handle = open(f"../output/{from_db}_prec_{ies_type}_ies_sequences.bed", "w")
+def create_all_oxytri_mac2012_mic2014(db_to: str, db_from: str):
+  create_name_temp_table(db_to, db_from, "Contig.*", "OXYTRI.*")
+  create_contig_table(db_to, db_from)
+  create_match_table(db_to, db_from)
+  create_pointer_table(db_to, db_from)
+  create_properties_table(db_to, db_from)
+  create_parameter_table(db_to, db_from)
+  create_coverage_table(db_to, db_from)
+  # create_gene.create_gene_table(db_to)
+  # create_gene.insert_gene_mac2012(db_to)
+  # create_gene.insert_gene_mic2014(db_to)
+  # create_ies.create_ies_table(db_to, "strict")
+  # create_ies.create_ies_table(db_to, "weak")
+  create_count_table(db_to, db_from)
+  create_alias_table(db_to, db_from)
+  insert_alias_contig(db_to)
+  insert_alias_gene(db_to)
+  insert_alias_file(
+    db_to,
+    constants.OXYTRI_MAC_2012_ALIAS,
+    "contig",
+    "mac",
+  )
+  insert_alias_file(
+    db_to,
+    constants.OXYTRI_MIC_2014_ALIAS,
+    "contig",
+    "mic",
+  )
+  create_variant_table(db_to)
+  create_stats_table(db_to)
+  create_protein_table(db_to)
+  insert_protein_file(db_to, constants.OXYTRI_MAC_2012_PROTEIN)
+  add_to_directory(
+    db_to,
+    "Oxytricha trifallax JRB310 (MAC 2013/MIC 2014)",
+    "Oxytricha trifallax JRB310 - SDRAP MDS/IES Annotation - MAC 2013 - MIC 2014",
+    "oxy_tri_jrb310",
+    "Only the finest specimen of space monkey dna.",
+    db_to,
+    "mac_2012,mic_2014",
+    "oxy_tri_jrb310_mac_2013_mic_2014",
+  )
+  dump_table_all(db_to)
 
-#   # write header
-#   if ies_type == "strict":
-#     handle.write(
-#       '#track name="prec_strict_ies_sequences" ' +
-#       'description="Strict IESs. Intervals on the precursor segment between two consecutive matches of a product segment ' +
-#       'that do not overlap matches of any other product segment. ' +
-#       'Labelled [product-name]_[left-flanking-match-indexes]_[right-flanking-match-indexes]" ' +
-#       'itemRgb-"On"\n'
-#     )
-#   elif ies_type == "weak":
-#     handle.write(
-#       '#track name="prec_weak_ies_sequences" ' +
-#       'description="Weak IESs. Intervals on the precursor segment between two consecutive matches of a product segment.' +
-#       'Labelled [product-name]_[left-flanking-match-indexes]_[right-flanking-match-indexes]" ' +
-#       'itemRgb-"On"\n'
-#     )
-#   else:
-#     raise Exception("Unknown ies type: " + str(ies_type))
+def create_all_oxytri_mac2020_mic2014(db_to: str, db_from: str):
+  create_name_temp_table(db_to, db_from, "Contig.*", "OXYTRI.*")
+  create_contig_table(db_to, db_from)
+  create_match_table(db_to, db_from)
+  create_pointer_table(db_to, db_from)
+  create_properties_table(db_to, db_from)
+  create_parameter_table(db_to, db_from)
+  create_coverage_table(db_to, db_from)
+  create_gene.create_gene_table(db_to)
+  create_gene.insert_gene_mac2012(db_to)
+  create_gene.insert_gene_mic2014(db_to)
+  create_ies.create_ies_table(db_to, "strict")
+  create_ies.create_ies_table(db_to, "weak")
+  create_count_table(db_to, db_from)
+  create_alias_table(db_to, db_from)
+  insert_alias_contig(db_to)
+  insert_alias_gene(db_to)
+  insert_alias_file(
+    db_to,
+    constants.OXYTRI_MAC_2020_ALIAS,
+    "contig",
+    "mac",
+  )
+  insert_alias_file(
+    db_to,
+    constants.OXYTRI_MIC_2014_ALIAS,
+    "contig",
+    "mic",
+  )
+  create_variant_table(db_to)
+  insert_variant_file(db_to, constants.OXYTRI_MAC_2020_VARIANT)
+  create_stats_table(db_to)
+  create_protein_table(db_to)
+  insert_protein_file(db_to, constants.OXYTRI_MAC_2020_PROTEIN)
+  add_to_directory(
+    db_to,
+    "Oxytricha trifallax JRB310 (MAC 2019/MIC 2014)",
+    "Oxytricha trifallax JRB310 - SDRAP MDS/IES Annotation - MAC 2019 - MIC 2014",
+    "oxy_tri_jrb310",
+    "Only the finest specimen of space monkey dna.",
+    db_to,
+    "mac_2020,mic_2014",
+    "oxy_tri_jrb310_mac_2019_mic_2014",
+  )
+  dump_table_all(db_to)
 
-#   conn = mysql_utils.get_connection()
-#   cursor = conn.cursor(dictionary=True)
-#   cursor.execute("SELECT COUNT(*) AS `count` FROM `{to_db}`.`ies_{$type}`;")
-#   num_ies = cursor.fetchall()["count"]
-  
-#   batch_size_rows = 10000
-#   for i in range(0, num_ies, batch_size_rows):
-#     cursor.execute(
-#       f"""
-#       SELECT
-#         `mic_name`,
-#         `mic_start`,
-#         `mic_end`,
-#         `mac_name`,
-#         `left_index`,
-#         `right_index`
-#       FROM `{to_db}`.`ies_{ies_type}`
-#       LIMIT {i}, {batch_size_rows};
-#       """
-#     )
-
-#     for result in cursor.fetchall():
-#       handle.write(
-#         f"{result['mic_name']}\t{result['mic_start']}\t{result['mic_end']}\t" + # chrom chromStart chromEnd
-#         f"{result['mac_name']}_{result['left_index']}_{result['right_index']}\t" + # name
-#         f"0\t+\t{result['mic_start']}\t{result['mic_end']}\t255,0,153\n" # score strand thickStart thickEnd itemRGB
-#       )
-
-#   cursor.close()
-#   conn.close()
-
-from_db = "sdrap_oxy_mac2012_May_30_2022"
-to_db = "hello_world"
+if __name__ == "__main__":
+  db_from = "sdrap_oxy_mac2012_May_30_2022"
+  db_to = "hello_world"
+  create_all_oxytri_mac2012_mic2014(db_to, db_from)
 
 # Retest everything
-create_name_temp_table(to_db, from_db, "Contig.*", "OXYTRI.*")
-# create_alias_table(to_db, from_db, ["main\\oxy_tri_jrb310_mac_2012_alias.csv", "main\\oxy_tri_jrb310_mic_2014_alias.csv"])
-# create_contig_table(to_db, from_db)
-# create_match_table(to_db, from_db)
-# create_pointer_table(to_db, from_db)
-# create_properties_table(to_db, from_db)
-# create_parameter_table(to_db, from_db)
-# create_coverage_table(to_db, from_db)
+# create_name_temp_table(db_to, db_from, "Contig.*", "OXYTRI.*")
+# create_alias_table(db_to, db_from, ["main\\oxy_tri_jrb310_mac_2012_alias.csv", "main\\oxy_tri_jrb310_mic_2014_alias.csv"])
+# create_contig_table(db_to, db_from)
+# create_match_table(db_to, db_from)
+# create_pointer_table(db_to, db_from)
+# create_properties_table(db_to, db_from)
+# create_parameter_table(db_to, db_from)
+# create_coverage_table(db_to, db_from)
 # GENES AND IES NEED TO BE DONE HERE
-# create_count_table(to_db, from_db)
-# create_alias_table(to_db, from_db)
-# insert_alias_contig(to_db)
-# insert_alias_gene(to_db)
+# create_count_table(db_to, db_from)
+# create_alias_table(db_to, db_from)
+# insert_alias_contig(db_to)
+# insert_alias_gene(db_to)
 # insert_alias_file(
-#   to_db,
+#   db_to,
 #   "data/oxy_tri_jrb310_mac_2012_alias.tsv",
 #   "contig",
 #   "mac",
 # )
 # insert_alias_file(
-#   to_db,
+#   db_to,
 #   "data/oxy_tri_jrb310_mic_2014_alias.tsv",
 #   "contig",
 #   "mic",
 # )
-# create_variant_table(to_db)
-# insert_variant_file(to_db, "data/oxy_tri_jrb310_mac_2020_variant.tsv")
-# create_stats_table(to_db)
-create_protein_table(to_db)
-insert_protein_file(to_db, "data/Oxytricha_trifallax_022112_aa.tsv")
+# create_variant_table(db_to)
+# insert_variant_file(db_to, "data/oxy_tri_jrb310_mac_2020_variant.tsv")
+# create_stats_table(db_to)
+# create_protein_table(db_to)
+# insert_protein_file(db_to, "data/Oxytricha_trifallax_022112_aa.tsv")
 # add_to_directory(
 #   "hello_world",
 #   "spacemonkey",

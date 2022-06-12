@@ -100,7 +100,7 @@ def insert_gene_file(to_db: str, file: str):
   cursor.close()
   conn.close()
 
-def create_gene_mac2012(db: str):
+def insert_gene_mac2012(db: str):
   insert_gene_file(db, constants.OXYTRI_MAC_2012_GENE_TSV)
 
 def insert_gene_mac2020(db: str):

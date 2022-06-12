@@ -79,72 +79,6 @@ def get_mac_matches(
     ],
   )
 
-# def get_mic_ies_strict(
-#   cursor,
-#   db: str,
-#   mic_name: str,
-#   mic_contig_id: str,
-# ):
-#   matches = get_mac_matches(cursor, db, mic_contig_id)
-
-#   intervals = matches[["mic_start", "mic_end"]]
-#   intervals = intervals.rename({"mic_start": "start", "mic_end": "end"}, axis="columns")
-#   intervals = intervals.to_dict("records")
-#   intervals = interval_utils.get_union(intervals)
-#   intervals_ies = []
-#   for i in range(len(intervals) - 1):
-#     intervals_ies.append({"start": intervals[i]["end"] + 1, "end": intervals[i + 1]["start"] - 1})
-#   intervals_ies = pd.DataFrame.from_records(intervals_ies, columns=["start", "end"])
-
-#   def collapse_matches(data: pd.DataFrame):
-#     data = data.sort_values("index")
-#     return pd.Series({
-#       "index": ",".join([str(i) for i in data["index"]]),
-#       "orientation": ",".join(data["orientation"])
-#     })
-
-#   matches_left = matches.drop("mic_start", axis="columns")
-#   matches_left = matches_left.rename({"mic_end": "start"}, axis="columns")
-#   matches_left["start"] += 1
-#   matches_left = pd.merge(intervals_ies, matches_left, on="start")
-#   matches_left = matches_left.groupby(["start", "end", "mac_contig_id", "mac_name"])
-#   matches_left = matches_left.apply(collapse_matches)
-
-#   matches_right = matches.drop("mic_end", axis="columns")
-#   matches_right = matches_right.rename({"mic_start": "end"}, axis="columns")
-#   matches_right["end"] -= 1
-#   matches_right = pd.merge(intervals_ies, matches_right, on="end")
-#   matches_right = matches_right.groupby(["start", "end", "mac_contig_id", "mac_name"])
-#   matches_right = matches_right.apply(collapse_matches)
-
-#   ies = pd.merge(
-#     matches_left,
-#     matches_right,
-#     how = "inner",
-#     left_index = True,
-#     right_index = True,
-#     suffixes = ("_left", "_right")
-#   )
-#   ies = ies.reset_index()
-#   ies["length"] = ies["end"] - ies["start"] + 1
-#   ies["mic_name"] = mic_name
-#   ies["mic_contig_id"] = mic_contig_id
-
-#   ies = ies.rename(
-#     {
-#       "start": "mic_start",
-#       "end": "mic_end",
-#       "index_left": "left_index",
-#       "index_right": "right_index",
-#       "orientation_left": "left_orientation",
-#       "orientation_right": "right_orientation",
-#     },
-#     axis = "columns",
-#   )
-#   ies = ies[IES_COLUMNS]
-#   return ies
-
-
 def get_mic_ies(
   cursor,
   db: str,
@@ -238,8 +172,8 @@ def get_mic_ies(
   return ies_data
 
 
-def make_ies_table(db: str, ies_type: str):
-  common_utils.log(f"{db} {ies_type}")
+def create_ies_table(db: str, ies_type: str):
+  common_utils.log(f"create_ies_table {db} {ies_type}")
 
   if ies_type not in ["strict", "weak"]:
     raise Exception("Impossible.") 

@@ -106,6 +106,12 @@ def fix_oxytri_mac2012_gene_data(data):
 def fix_oxytri_mic2014_gene_data(data):
   return data.assign(type=data["type"].replace("transcript", "mRNA"))
 
+def fix_oxytri_tglo_hightxn(data):
+  pass # IMPLEMENT!!!
+
+def fix_oxytri_tglo_lowtxn(data):
+  pass # IMPLEMENT!!!
+
 def parse_gff(gff_file, nucleus):
   data = pd.read_csv(gff_file, sep="\t", header=None, comment="#")
 
