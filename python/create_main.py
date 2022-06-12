@@ -49,6 +49,20 @@ def create_name_temp_table(
     """
   )
 
+  x = f"""
+    INSERT INTO `{db_to}`.`name_temp`
+    (
+      `contig_id`,
+      `name`
+    )
+    SELECT
+      `nuc_id`,
+      `alias`
+    FROM `{db_from}`.`alias`
+    WHERE `alias` REGEXP '{mac_name_regex}'
+    OR `alias` REGEXP '{mic_name_regex}';
+    """.replace("\n", " ")
+  print(x)
   cursor.execute(
     f"""
     INSERT INTO `{db_to}`.`name_temp`
@@ -61,8 +75,8 @@ def create_name_temp_table(
       `alias`
     FROM `{db_from}`.`alias`
     WHERE `alias` REGEXP '{mac_name_regex}'
-    OR `alias` REGEXP '{mic_name_regex}';"
-    """
+    OR `alias` REGEXP '{mic_name_regex}';
+    """.replace("\n", " "),
   )
 
   cursor.close()
