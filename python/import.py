@@ -12,7 +12,15 @@ import common_utils
 import interval_utils
 import mysql_utils
 
-SQL_BATCH_UPLOAD_ROWS = 1000
+
+def create_database(db: str):
+  common_utils.log(f"create_database {db}")
+  conn = mysql_utils.get_connection()
+  cursor = conn.cursor()
+  cursor.execut(f"DROP DATABASE IF EXISTS `{db}`;")
+  cursor.execute(f"CREATE DATABASE `{db}`;")
+  cursor.close()
+  conn.close()
 
 def create_name_temp_table(
   to_db: str,
@@ -1566,10 +1574,9 @@ def dump_table(
 
 from_db = "sdrap_oxy_mac2012_May_30_2022"
 to_db = "hello_world"
-# conn = mysql_utils.get_connection()
 
 # Retest everything
-# create_name_temp_table("hello_world", from_db, "Contig.*", "OXYTRI.*")
+create_name_temp_table(to_db, from_db, "Contig.*", "OXYTRI.*")
 # create_alias_table(to_db, from_db, ["main\\oxy_tri_jrb310_mac_2012_alias.csv", "main\\oxy_tri_jrb310_mic_2014_alias.csv"])
 # create_contig_table(to_db, from_db)
 # create_match_table(to_db, from_db)

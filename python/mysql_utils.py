@@ -13,8 +13,7 @@ def get_connection() -> mysql.connector.MySQLConnection:
   )
   return conn
 
-
-def make_sql_values(data):
+def make_sql_values(data) -> str:
   data = data.applymap(lambda x: "NULL" if pd.isna(x) else f"'{x}'")
   data = data.apply(
     lambda row: "(" + ",".join(row) + ")",
