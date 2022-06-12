@@ -1,3 +1,4 @@
+import os
 import pandas as pd
 
 import common_utils
@@ -6,7 +7,7 @@ import mysql.connector
 def get_connection() -> mysql.connector.MySQLConnection:
   conn = mysql.connector.connect(
     host = "localhost",
-    port = "8888",
+    port = "8888" if os.name == "nt" else "3306", # FIXME: HACK FOR TESTING ON SERVER, MAKE THIS CONFIGURABLE FROM COMMAND LINE
     user = "web",
     password = "RZhRwsau6HZrMUXf",
     autocommit = True,
