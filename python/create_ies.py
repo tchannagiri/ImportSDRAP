@@ -236,7 +236,7 @@ def create_ies_table(db: str, ies_type: str):
         f"""
         INSERT INTO `{db}`.`ies_{ies_type}`
         ({sql_columns})
-        VALUES {values};"
+        VALUES {values};
         """
       )
       cursor.close()

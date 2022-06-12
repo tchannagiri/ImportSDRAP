@@ -38,7 +38,7 @@ def upload_in_chunks(
       f"""
       INSERT INTO `{db}`.`{table_name}`
       ({columns_sql})
-      VALUES {values}
+      VALUES {values};
       """
     )
 

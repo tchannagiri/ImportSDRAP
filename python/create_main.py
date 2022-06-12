@@ -49,20 +49,6 @@ def create_name_temp_table(
     """
   )
 
-  x = f"""
-    INSERT INTO `{db_to}`.`name_temp`
-    (
-      `contig_id`,
-      `name`
-    )
-    SELECT
-      `nuc_id`,
-      `alias`
-    FROM `{db_from}`.`alias`
-    WHERE `alias` REGEXP '{mac_name_regex}'
-    OR `alias` REGEXP '{mic_name_regex}';
-    """.replace("\n", " ")
-  print(x)
   cursor.execute(
     f"""
     INSERT INTO `{db_to}`.`name_temp`
@@ -76,7 +62,7 @@ def create_name_temp_table(
     FROM `{db_from}`.`alias`
     WHERE `alias` REGEXP '{mac_name_regex}'
     OR `alias` REGEXP '{mic_name_regex}';
-    """.replace("\n", " "),
+    """
   )
 
   cursor.close()
@@ -653,7 +639,7 @@ def create_coverage_table(db_to: str, db_from: str):
       LEFT JOIN
         `{db_to}`.`contig` AS `NMIC`
       ON
-        `T`.`mic_contig_id` = `NMIC`.`contig_id`;"
+        `T`.`mic_contig_id` = `NMIC`.`contig_id`;
       """
     )
   cursor.close()
