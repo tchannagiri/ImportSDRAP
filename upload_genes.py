@@ -82,7 +82,8 @@ def create_gene_table(to_db: str, file: str):
       "attr_parent_gene",
     ],
     cursor,
-    f"`{to_db}`.`gene`",
+    to_db,
+    "gene",
     constants.SQL_BATCH_UPLOAD_ROWS,
   )
   # for i in range(0, data.shape[0], constants.SQL_BATCH_UPLOAD_ROWS):

@@ -14,10 +14,51 @@ import mysql_utils
 
 SQL_BATCH_UPLOAD_ROWS = 1000
 
-def create_contig_table(
-  to_db : str,
-  from_db : str,
+def create_name_temp_table(
+  to_db: str,
+  from_db: str,
+  mac_name_regex: str,
+  mic_name_regex: str,
 ):
+  common_utils.log(
+    f"create_name_temp_table {to_db} {from_db}" +
+    f" {mac_name_regex} {mic_name_regex}"
+  )
+
+  conn = mysql_utils.get_connection()
+  cursor = conn.cursor()
+  cursor.execute(f"DROP TABLE IF EXISTS `{to_db}`.`name_temp`;")
+  cursor.execute(
+    f"""
+    CREATE TABLE `{to_db}`.`name_temp` (
+      `contig_id` INT NOT NULL,
+      `name` VARCHAR(50) NOT NULL,
+      PRIMARY KEY (`contig_id`),
+      KEY `name` (`name`)
+    );
+    """
+  )
+
+  cursor.execute(
+    f"""
+    INSERT INTO `{to_db}`.`name_temp`
+    (
+      `contig_id`,
+      `name`
+    )
+    SELECT
+      `nuc_id`,
+      `alias`
+    FROM `{from_db}`.`alias`
+    WHERE `alias` REGEXP '{mac_name_regex}'
+    OR `alias` REGEXP '{mic_name_regex}';"
+    """
+  )
+
+  cursor.close()
+  conn.close()
+
+def create_contig_table(to_db: str, from_db: str):
   common_utils.log(f"make_contig_table {to_db} {from_db}")
 
   conn = mysql_utils.get_connection()
@@ -76,13 +117,8 @@ def create_contig_table(
       IF(`T`.`three_length` = 0 OR `T`.`three_length` IS NULL, 0, `T`.`three_start` + `T`.`three_length` - 1) AS `telomere_three_end`,
       UPPER(`N`.`sequence`) AS `sequence`
     FROM `{from_db}`.`nucleotide` AS `N`
-    LEFT JOIN (
-      SELECT `name`, `id`
-      FROM `{to_db}`.`alias`
-      WHERE `table` = 'contig'
-      GROUP BY `id`
-    ) AS `A`
-      ON `N`.`nuc_id` = `A`.`id`
+    LEFT JOIN `{to_db}`.`name_temp` AS `A`
+      ON `N`.`nuc_id` = `A`.`contig_id`
     LEFT JOIN `{from_db}`.`feature` AS `F`
       ON `N`.`feat_id` = `F`.`feat_id`
     LEFT JOIN `{from_db}`.`telomere` AS `T`
@@ -144,7 +180,8 @@ def create_alias_table(
       alias_to,
       ["id", "name", "alias", "table", "type"],
       cursor,
-      f"`{to_db}`.`alias`",
+      to_db,
+      "alias",
       constants.SQL_BATCH_UPLOAD_ROWS,
     )
     # for i in range(0, alias_to.shape[0], SQL_BATCH_UPLOAD_ROWS):
@@ -899,67 +936,640 @@ def create_count_table(to_db: str, from_db: str):
   cursor.close()
   conn.close()
 
-# #track name="prec_eliminated_sequences" description="intervals comprising complement of the precursor segments labelled comp_[left-flanking-segment-prod-id]_[left-flanking-segment-index]_[right-flanking-segment-prod-id]_[right-flanking-segment-index]" itemRgb-"On"
-# OXYTRI_MIC_33550	1	8703	none_0_Contig4386.0_-1	0	+	1	8703	255,0,153
-# sdrap_oxy_mac2012_100720_prec_eliminated_sequences.bed
-def make_ie_bed(to_db: str, from_db: str, ies_type: str):
-  handle = open(f"../output/{from_db}_prec_{ies_type}_ies_sequences.bed", "w")
-
-  # write header
-  if ies_type == "strict":
-    handle.write(
-      '#track name="prec_strict_ies_sequences" ' +
-      'description="Strict IESs. Intervals on the precursor segment between two consecutive matches of a product segment ' +
-      'that do not overlap matches of any other product segment. ' +
-      'Labelled [product-name]_[left-flanking-match-indexes]_[right-flanking-match-indexes]" ' +
-      'itemRgb-"On"\n'
-    )
-  elif ies_type == "weak":
-    handle.write(
-      '#track name="prec_weak_ies_sequences" ' +
-      'description="Weak IESs. Intervals on the precursor segment between two consecutive matches of a product segment.' +
-      'Labelled [product-name]_[left-flanking-match-indexes]_[right-flanking-match-indexes]" ' +
-      'itemRgb-"On"\n'
-    )
-  else:
-    raise Exception("Unknown ies type: " + str(ies_type))
+def create_alias_table(to_db: str):
+  common_utils.log(f"create_alias_table {to_db}")
 
   conn = mysql_utils.get_connection()
-  cursor = conn.cursor(dictionary=True)
-  cursor.execute("SELECT COUNT(*) AS `count` FROM `{$to}`.`ies_{$type}`;")
-  num_ies = cursor.fetchall()["count"]
-  
-  batch_size_rows = 10000
-  for i in range(0, num_ies, batch_size_rows):
-    cursor.execute(
-      f"""
-      SELECT
-        `mic_name`,
-        `mic_start`,
-        `mic_end`,
-        `mac_name`,
-        `left_index`,
-        `right_index`
-      FROM `{to_db}`.`ies_{ies_type}`
-      LIMIT {i}, {batch_size_rows};
-      """
-    )
+  cursor = conn.cursor()
 
-    for result in cursor.fetchall():
-      handle.write(
-        f"{result['mic_name']}\t{result['mic_start']}\t{result['mic_end']}\t" + # chrom chromStart chromEnd
-        f"{result['mac_name']}_{result['left_index']}_{result['right_index']}\t" + # name
-        f"0\t+\t{result['mic_start']}\t{result['mic_end']}\t255,0,153\n" # score strand thickStart thickEnd itemRGB
-      )
+  cursor.execute(f"DROP TABLE IF EXISTS `{to_db}`.`alias`;")
+  cursor.execute(
+    f"""
+    CREATE TABLE `{to_db}`.`alias` (
+      `alias_id` INT NOT NULL AUTO_INCREMENT COMMENT 'primary key for the table',
+      `id` INT NOT NULL COMMENT 'primary key of the table for the corresponding sequence',
+      `name` VARCHAR(50) NOT NULL COMMENT 'the primary name of the sequence',
+      `alias` VARCHAR(50) NOT NULL COMMENT 'alias of the sequence',
+      `table` VARCHAR(50) NOT NULL COMMENT 'the table that `id` refers to',
+      `type` VARCHAR(50) DEFAULT NULL COMMENT 'the type of alias',
+      PRIMARY KEY (`alias_id`),
+      KEY `alias` (`alias`)
+    ) COMMENT='table of sequence aliases';
+    """
+  )
 
   cursor.close()
   conn.close()
+
+def insert_alias_gene(to_db: str):
+  common_utils.log(f"insert_alias_gene {to_db}")
+
+  conn = mysql_utils.get_connection()
+  cursor = conn.cursor()
+
+  cursor.execute(
+    f"""
+    INSERT INTO `{to_db}`.`alias`
+    (
+      `id`,
+      `name`,
+      `alias`,
+      `table`,
+      `type`
+    )
+    SELECT
+      `G`.`gene_id` AS `id`,
+      `G`.`attr_id` AS `name`,
+      `G`.`attr_id` AS `alias`,
+      'gene' AS `table`,
+      'primary' AS `type`
+    FROM `{to_db}`.`gene` AS `G`
+    WHERE `G`.`type` = 'gene';
+    """
+  )
+
+  cursor.close()
+  conn.close()
+
+def insert_alias_contig(to_db: str):
+  common_utils.log(f"insert_alias_contig {to_db}")
+
+  conn = mysql_utils.get_connection()
+  cursor = conn.cursor()
+
+  cursor.execute(
+    f"""
+    INSERT INTO `{to_db}`.`alias`
+    (
+      `id`,
+      `name`,
+      `alias`,
+      `table`,
+      `type`
+    )
+    SELECT
+      `C`.`contig_id` AS `id`,
+      `C`.`name` AS `name`,
+      `C`.`name` AS `name`,
+      'contig' AS `table`,
+      'primary' AS `type`
+    FROM `{to_db}`.`contig` AS `C`;
+    """
+  )
+  cursor.close()
+  conn.close()
+
+
+def insert_alias_file(to_db: str, file: str, table: str, nucleus: str):
+  common_utils.log(f"insert_alias_file {to_db} {file} {table} {nucleus}")
+  
+  conn = mysql_utils.get_connection()
+  cursor = conn.cursor()
+
+  cursor.execute(f"DROP TABLE IF EXISTS `{to_db}`.`alias_temp`;");
+  cursor.execute(
+    f"""
+    CREATE TABLE `{to_db}`.`alias_temp` (
+      `name` VARCHAR(50),
+      `alias` VARCHAR(50),
+      `type` VARCHAR(50),
+      KEY (`name`)
+    );
+    """
+  )
+  
+  alias_data = common_utils.read_tsv(file)
+  alias_data = alias_data.melt(
+    id_vars = "primary",
+    var_name = "type",
+    value_name = "alias",
+  )
+  alias_data = alias_data.dropna(axis="index")
+  alias_data = alias_data.rename({"primary": "name"}, axis="columns")
+  mysql_utils.upload_in_chunks(
+    alias_data,
+    ["name", "alias", "type"],
+    cursor,
+    to_db,
+    "alias_temp",
+    constants.SQL_BATCH_UPLOAD_ROWS,
+  )
+
+  if table == 'contig':
+    name_column = 'name'
+    nucleus_column = 'nucleus'
+  elif table == 'gene':
+    name_column = 'attr_id'
+    nucleus_column = 'contig_nucleus'
+  else:
+    raise Exception(f"Unexpected table: {table}")
+
+  cursor.execute(
+    f"""
+    INSERT INTO
+      `{to_db}`.`alias`
+      (
+        `id`,
+        `name`,
+        `alias`,
+        `table`,
+        `type`
+      )
+      SELECT
+        `T`.`{table}_id`,
+        `U`.`name`,
+        `U`.`alias`,
+        '{table}',
+        `U`.`type`
+      FROM `{to_db}`.`alias_temp` AS `U`
+      INNER JOIN `{to_db}`.`{table}` AS `T`
+      ON `T`.`{name_column}` = `U`.`name`
+      AND `T`.`{nucleus_column}` = '{nucleus}';
+    """
+  )
+
+  cursor.close()
+  conn.close()
+
+
+def create_variant_table(to_db: str):
+  common_utils.log(f"create_variant_table {to_db}")
+
+  conn = mysql_utils.get_connection()
+  cursor = conn.cursor()
+
+  cursor.execute(f"DROP TABLE IF EXISTS `{to_db}`.`variant`;")
+  cursor.execute(
+    f"""
+    CREATE TABLE `{to_db}`.`variant` (
+      `contig_id` INT NOT NULL AUTO_INCREMENT COMMENT 'primary key for the table',
+      `name` VARCHAR(50) NOT NULL COMMENT 'the primary name of the sequence',
+      `variant` VARCHAR(500) NOT NULL COMMENT 'variants/isoforms of the sequence',
+      PRIMARY KEY (`contig_id`)
+    ) COMMENT='Variants/isoforms of sequences';
+    """
+  )
+
+def insert_variant_file(to_db: str, file: str):
+  common_utils.log(f"insert_variant_file {to_db} {file}")
+
+  conn = mysql_utils.get_connection()
+  cursor = conn.cursor()
+
+  cursor.execute(f"DROP TABLE IF EXISTS `{to_db}`.`variant_temp`;")
+  cursor.execute(
+    f"""
+    CREATE TABLE `{to_db}`.`variant_temp` (
+      `name` VARCHAR(50),
+      `variant` VARCHAR(500),
+      KEY (`name`)
+    );
+    """
+  )
+  
+  variant_data = common_utils.read_tsv(file)
+  mysql_utils.upload_in_chunks(
+    variant_data,
+    ["name", "variant"],
+    cursor,
+    to_db,
+    "variant_temp",
+    constants.SQL_BATCH_UPLOAD_ROWS,
+  )
+  
+  cursor.execute(
+    f"""
+    INSERT INTO
+      `{to_db}`.`variant`
+      (
+        `contig_id`,
+        `name`,
+        `variant`
+      )
+      SELECT
+        `C`.`contig_id`,
+        `C`.`name`,
+        `V`.`variant`
+      FROM `{to_db}`.`variant_temp` AS `V`
+      INNER JOIN `{to_db}`.`contig` AS `C`
+      ON `V`.`name` = `C`.`name`;
+    """
+  )
+
+  cursor.close()
+  conn.close()
+
+
+def create_stats_table(to_db: str):
+  common_utils.log(f"create_stats_table {to_db}")
+
+  conn = mysql_utils.get_connection()
+  cursor = conn.cursor(dictionary=True)
+
+  cursor.execute(f"DROP TABLE IF EXISTS `{to_db}`.`stats`;")
+  cursor.execute(
+    f"""
+    CREATE TABLE `{to_db}`.`stats` (
+      `stats_id` INT NOT NULL AUTO_INCREMENT COMMENT 'Primary key for the table',
+      `contig_mac_two_telomere` INT NOT NULL COMMENT 'Number of 2-telomere MAC contigs in the database',
+      `contig_mac_one_telomere` INT NOT NULL COMMENT 'Number of 1-telomere MAC contigs in the database',
+      `contig_mac_zero_telomere` INT NOT NULL COMMENT 'Number of 0-telomere MAC contigs in the database',
+      `contig_mac_total` INT NOT NULL COMMENT 'Number of total MAC contigs in the database',
+      `contig_mic_two_telomere` INT NOT NULL COMMENT 'Number of 2-telomere MIC contigs in the database',
+      `contig_mic_one_telomere` INT NOT NULL COMMENT 'Number of 1-telomere MIC contigs in the database',
+      `contig_mic_zero_telomere` INT NOT NULL COMMENT 'Number of 0-telomere MIC contigs in the database',
+      `contig_mic_total` INT NOT NULL COMMENT 'Number of total MIC contigs in the database',
+      `gene_mac_total` INT NOT NULL COMMENT 'Number of total MAC genes in the database',
+      `gene_mic_total` INT NOT NULL COMMENT 'Number of total MIC genes in the database',
+      `mds_mac_total` INT NOT NULL COMMENT 'Number of total MAC MDSs in the database',
+      `mds_mic_total` INT NOT NULL COMMENT 'Number of total MIC MDSs in the database',
+      `ies_mac_total` INT NOT NULL COMMENT 'Number of total MAC IESs (strict) in the database',
+      `ies_mic_total` INT NOT NULL COMMENT 'Number of total MIC IESs (strict) in the database',
+      `pointer_mac_total` INT NOT NULL COMMENT 'Number of total MAC pointers in the database',
+      `pointer_mic_total` INT NOT NULL COMMENT 'Number of total MIC pointers in the database',
+      `properties_non_gapped` INT NOT NULL COMMENT 'Number of non-gapped rearrangement maps in the database',
+      `properties_non_overlapping` INT NOT NULL COMMENT 'Number of non-overlapping rearrangement maps in the database',
+      `properties_non_repeating` INT NOT NULL COMMENT 'Number of non-repeating rearrangement maps in the database',
+      `properties_exceeded_clique_limit` INT NOT NULL COMMENT 'Number of exceeded-clique-limit rearrangement maps in the database',
+      `properties_weakly_complete` INT NOT NULL COMMENT 'Number of weakly-complete rearrangement maps in the database',
+      `properties_strongly_complete` INT NOT NULL COMMENT 'Number of strongly-complete rearrangement maps in the database',
+      `properties_weakly_consecutive` INT NOT NULL COMMENT 'Number of weakly-consecutive rearrangement maps in the database',
+      `properties_strongly_consecutive` INT NOT NULL COMMENT 'Number of strongly-consecutive rearrangement maps in the database',
+      `properties_weakly_ordered` INT NOT NULL COMMENT 'Number of weakly-ordered rearrangement maps in the database',
+      `properties_strongly_ordered` INT NOT NULL COMMENT 'Number of strongly-ordered rearrangement maps in the database',
+      `properties_weakly_non_scrambled` INT NOT NULL COMMENT 'Number of weakly-non-scrambled rearrangement maps in the database',
+      `properties_strongly_non_scrambled` INT NOT NULL COMMENT 'Number of strongly-non-scrambled rearrangement maps in the database',
+      `properties_total` INT NOT NULL COMMENT 'Number of total rearrangement maps in the database',
+      PRIMARY KEY (`stats_id`)
+    ) COMMENT='Summary statistics of the database';
+    """
+  )
+
+  stats = {}
+
+  for nucleus in ['mac', 'mic']:
+    # contig query
+    cursor.execute(
+      f"""
+      SELECT
+        SUM( ( ( `telomere_five_start` > 0 ) + ( `telomere_three_start` > 0 ) ) = 2 ) AS `two_telomere`,
+        SUM( ( ( `telomere_five_start` > 0 ) + ( `telomere_three_start` > 0 ) ) = 1 ) AS `one_telomere`,
+        SUM( ( ( `telomere_five_start` > 0 ) + ( `telomere_three_start` > 0 ) ) = 0 ) AS `zero_telomere`,
+        COUNT(*) AS `total`
+      FROM `{to_db}`.`contig`
+      WHERE `nucleus` = '{nucleus}';
+      """
+    )
+    result = cursor.fetchall()[0]
+    stats[f"contig_{nucleus}_two_telomere"] = result["two_telomere"]
+    stats[f"contig_{nucleus}_one_telomere"] = result["one_telomere"]
+    stats[f"contig_{nucleus}_zero_telomere"] = result["zero_telomere"]
+    stats[f"contig_{nucleus}_total"] = result["total"]
+
+    # gene query
+    cursor.execute(
+      f"""
+      SELECT
+        COUNT(*) AS `total`
+      FROM `{to_db}`.`gene` AS `G`
+      INNER JOIN `{to_db}`.`contig` AS `C`
+        ON `C`.`contig_id` = `G`.`contig_id`
+      WHERE `G`.`type` = 'gene'
+      AND `C`.`nucleus` = '{nucleus}';
+      """
+    )
+    result = cursor.fetchall()[0]
+    stats[f"gene_{nucleus}_total"] = result["total"]
+
+    # MDS query
+    cursor.execute(
+      f"""
+      SELECT
+        COUNT(*) AS `total`
+      FROM `{to_db}`.`match`
+        WHERE `is_preliminary` = 1;
+      """
+    )
+    result = cursor.fetchall()[0]
+    stats[f"mds_{nucleus}_total"] = result["total"]
+
+    # IES strict query
+    if nucleus == "mic":
+      cursor.execute(
+        f"""
+        SELECT
+          COUNT(*) AS `total`
+        FROM `{to_db}`.`ies_strict`;
+        """
+      )
+      result = cursor.fetchall()[0]
+      stats[f"ies_{nucleus}_total"] = result["total"]
+    elif nucleus == "mac":
+      stats[f"ies_{nucleus}_total"] = 0
+    else:
+      raise Exception("Impossible.")
+
+    # pointer query
+    cursor.execute(
+      f"""
+      SELECT
+        COUNT(*) AS `total`
+      FROM `{to_db}`.`pointer`;
+      """
+    )
+    result = cursor.fetchall()[0]
+    stats[f"pointer_{nucleus}_total"] = {
+      "mic": 2 * result["total"], # count each pointer 2x for MIC
+      "mac": result["total"],
+    }[nucleus]
+
+  # properties query
+  cursor.execute(
+    f"""
+    SELECT
+      SUM(`non_gapped`) AS `non_gapped`,
+      SUM(`non_overlapping`) AS `non_overlapping`,
+      SUM(`non_repeating`) AS `non_repeating`,
+      SUM(`exceeded_clique_limit`) AS `exceeded_clique_limit`,
+      SUM(`weakly_complete`) AS `weakly_complete`,
+      SUM(`strongly_complete`) AS `strongly_complete`,
+      SUM(`weakly_consecutive`) AS `weakly_consecutive`,
+      SUM(`strongly_consecutive`) AS `strongly_consecutive`,
+      SUM(`weakly_ordered`) AS `weakly_ordered`,
+      SUM(`strongly_ordered`) AS `strongly_ordered`,
+      SUM(`weakly_non_scrambled`) AS `weakly_non_scrambled`,
+      SUM(`strongly_non_scrambled`) AS `strongly_non_scrambled`,
+      COUNT(*) AS `total`
+    FROM `{to_db}`.`properties`;
+    """
+  )
+  result = cursor.fetchall()[0]
+  stats['properties_non_gapped'] = result['non_gapped']
+  stats['properties_non_overlapping'] = result['non_overlapping']
+  stats['properties_non_repeating'] = result['non_repeating']
+  stats['properties_exceeded_clique_limit'] = result['exceeded_clique_limit']
+  stats['properties_weakly_complete'] = result['weakly_complete']
+  stats['properties_strongly_complete'] = result['strongly_complete']
+  stats['properties_weakly_consecutive'] = result['weakly_consecutive']
+  stats['properties_strongly_consecutive'] = result['strongly_consecutive']
+  stats['properties_weakly_ordered'] = result['weakly_ordered']
+  stats['properties_strongly_ordered'] = result['strongly_ordered']
+  stats['properties_weakly_non_scrambled'] = result['weakly_non_scrambled']
+  stats['properties_strongly_non_scrambled'] = result['strongly_non_scrambled']
+  stats['properties_total'] = result['total']
+
+  fields = "(" + ','.join([f"`{x}`" for x in stats.keys()]) + ")"
+  values = "(" + ','.join([f"'{x}'" for x in stats.values()]) + ")"
+
+  # insert values
+  cursor.execute(
+    f"""
+    INSERT INTO `{to_db}`.`stats` {fields}
+    VALUES {values};
+    """
+  )
+
+
+def create_protein_table(db: str):
+  common_utils.log(f"create_protein_table {db}")
+
+  conn = mysql_utils.get_connection()
+  cursor = conn.cursor()
+
+  cursor.execute(f"DROP TABLE IF EXISTS `{db}`.`protein`;")
+  cursor.execute(
+    f"""
+    CREATE TABLE `{db}`.`protein` (
+      `prot_id` int(11) NOT NULL AUTO_INCREMENT COMMENT 'Index of the `protein` table',
+      `gene_id` int(11) DEFAULT NULL COMMENT 'Index of the corresponding mRNA feature in the table `gene`',
+      `attr_id` varchar(50) DEFAULT NULL COMMENT 'Name of the corresponding mRNA feature',
+      `length` int(11) NOT NULL COMMENT 'Length of the protein sequence in amino acids',
+      `sequence` longtext COMMENT 'Sequence of amino acids for the protein',
+      PRIMARY KEY (`prot_id`),
+      UNIQUE KEY `gene_id` (`gene_id`),
+      KEY `attr_id` (`attr_id`)
+    ) COMMENT='Table of Predicted Proteins';
+    """
+  )
+
+  cursor.close()
+  conn.close()
+
+def insert_protein_file(db: str, file: str):
+  common_utils.log(f"insert_protein_file {db} {file}")
+
+  conn = mysql_utils.get_connection()
+  cursor = conn.cursor()
+
+  cursor.execute(f"DROP TABLE IF EXISTS `{db}`.`protein_temp`;")
+  cursor.execute(
+    f"""
+    CREATE TABLE `{db}`.`protein_temp` (
+      `attr_id` VARCHAR(50),
+      `sequence` longtext,
+      KEY (`attr_id`)
+    );
+    """
+  )
+
+  data = common_utils.read_tsv(file)
+  mysql_utils.upload_in_chunks(
+    data,
+    ["attr_id", "sequence"],
+    cursor,
+    db,
+    "protein_temp",
+    constants.SQL_BATCH_UPLOAD_ROWS,
+  )
+
+  cursor.execute(
+    f"""
+    INSERT INTO
+    `{db}`.`protein`
+    (
+      `gene_id`,
+      `attr_id`,
+      `length`,
+      `sequence`
+    )
+    SELECT
+      `G`.`gene_id`,
+      `G`.`attr_id`,
+      LENGTH(`T`.`sequence`),
+      `T`.`sequence`
+    FROM `{db}`.`protein_temp` AS `T`
+    INNER JOIN `{db}`.`gene` AS `G`
+    ON `G`.`attr_id` = `T`.`attr_id`;
+    """
+  )
+
+  cursor.close()
+  conn.close()
+
+def drop_temp_tables(db: str):
+  common_utils.log(f"drop_temp_tables {db}")
+
+  conn = mysql_utils.get_connection()
+  cursor = conn.cursor(dictionary=True)
+
+  temp_tables = [
+    "name_temp",
+    "alias_temp",
+    "variant_temp",
+    "protein_temp",
+  ]
+  for table in temp_tables:
+    cursor.execute(f"DROP TABLE IF EXISTS `{db}`.`{table}`;")
+
+def add_to_directory(
+  db: str,
+  name: str,
+  description: str,
+  organism: str,
+  download_dir: str,
+  assembly: str,
+  url: str,
+):
+  common_utils.log(
+    "add_to_directory" + " " +
+    db + " " +
+    name + " " +
+    description + " " +
+    organism + " " +
+    download_dir + " " +
+    assembly + " " +
+    url
+  )
+
+  conn = mysql_utils.get_connection()
+  cursor = conn.cursor(dictionary=True)
+
+  cursor.execute(
+    f"""
+    INSERT INTO `mds_ies_db`.`db`
+    (
+      `name`,
+      `description`,
+      `sql_name`,
+      `organism`,
+      `download_dir`,
+      `assembly`,
+      `url`
+    )
+    VALUES
+    (
+      '{name}',
+      '{description}',
+      '{db}',
+      '{organism}',
+      '{download_dir}',
+      '{assembly}',
+      '{url}'
+    );
+    """
+  )
+
+  cursor.close()
+  conn.close()
+
+def dump_table(
+  db: str,
+  table: str,
+  file: str,
+):
+  common_utils.log(f"dump_table {db} {table} {file}");
+
+  conn = mysql_utils.get_connection()
+  cursor = conn.cursor()
+
+  cursor.execute(
+    f"""
+    SELECT `COLUMN_NAME`
+    FROM `INFORMATION_SCHEMA`.`COLUMNS`
+    WHERE `TABLE_SCHEMA` = '{db}'
+    AND `TABLE_NAME` = '{table}';
+    """
+  )
+  columns = cursor.fetchall()
+  columns = [x[0] for x in columns]
+
+  cursor.execute(f"SELECT COUNT(*) FROM `{db}`.`{table}`;")
+  num_rows = cursor.fetchall()[0][0]
+
+  data = mysql_utils.download_in_chunks(
+    db,
+    table,
+    columns,
+    cursor,
+    num_rows,
+    batch_size = constants.SQL_BATCH_DOWNLOAD_ROWS,
+  )
+
+  common_utils.write_tsv(data, file)
+
+
+# # #track name="prec_eliminated_sequences" description="intervals comprising complement of the precursor segments labelled comp_[left-flanking-segment-prod-id]_[left-flanking-segment-index]_[right-flanking-segment-prod-id]_[right-flanking-segment-index]" itemRgb-"On"
+# # OXYTRI_MIC_33550	1	8703	none_0_Contig4386.0_-1	0	+	1	8703	255,0,153
+# # sdrap_oxy_mac2012_100720_prec_eliminated_sequences.bed
+# def make_ie_bed(to_db: str, from_db: str, ies_type: str):
+#   handle = open(f"../output/{from_db}_prec_{ies_type}_ies_sequences.bed", "w")
+
+#   # write header
+#   if ies_type == "strict":
+#     handle.write(
+#       '#track name="prec_strict_ies_sequences" ' +
+#       'description="Strict IESs. Intervals on the precursor segment between two consecutive matches of a product segment ' +
+#       'that do not overlap matches of any other product segment. ' +
+#       'Labelled [product-name]_[left-flanking-match-indexes]_[right-flanking-match-indexes]" ' +
+#       'itemRgb-"On"\n'
+#     )
+#   elif ies_type == "weak":
+#     handle.write(
+#       '#track name="prec_weak_ies_sequences" ' +
+#       'description="Weak IESs. Intervals on the precursor segment between two consecutive matches of a product segment.' +
+#       'Labelled [product-name]_[left-flanking-match-indexes]_[right-flanking-match-indexes]" ' +
+#       'itemRgb-"On"\n'
+#     )
+#   else:
+#     raise Exception("Unknown ies type: " + str(ies_type))
+
+#   conn = mysql_utils.get_connection()
+#   cursor = conn.cursor(dictionary=True)
+#   cursor.execute("SELECT COUNT(*) AS `count` FROM `{to_db}`.`ies_{$type}`;")
+#   num_ies = cursor.fetchall()["count"]
+  
+#   batch_size_rows = 10000
+#   for i in range(0, num_ies, batch_size_rows):
+#     cursor.execute(
+#       f"""
+#       SELECT
+#         `mic_name`,
+#         `mic_start`,
+#         `mic_end`,
+#         `mac_name`,
+#         `left_index`,
+#         `right_index`
+#       FROM `{to_db}`.`ies_{ies_type}`
+#       LIMIT {i}, {batch_size_rows};
+#       """
+#     )
+
+#     for result in cursor.fetchall():
+#       handle.write(
+#         f"{result['mic_name']}\t{result['mic_start']}\t{result['mic_end']}\t" + # chrom chromStart chromEnd
+#         f"{result['mac_name']}_{result['left_index']}_{result['right_index']}\t" + # name
+#         f"0\t+\t{result['mic_start']}\t{result['mic_end']}\t255,0,153\n" # score strand thickStart thickEnd itemRGB
+#       )
+
+#   cursor.close()
+#   conn.close()
 
 from_db = "sdrap_oxy_mac2012_May_30_2022"
 to_db = "hello_world"
 # conn = mysql_utils.get_connection()
 
 # Retest everything
+# create_name_temp_table("hello_world", from_db, "Contig.*", "OXYTRI.*")
 # create_alias_table(to_db, from_db, ["main\\oxy_tri_jrb310_mac_2012_alias.csv", "main\\oxy_tri_jrb310_mic_2014_alias.csv"])
 # create_contig_table(to_db, from_db)
 # create_match_table(to_db, from_db)
@@ -967,28 +1577,35 @@ to_db = "hello_world"
 # create_properties_table(to_db, from_db)
 # create_parameter_table(to_db, from_db)
 # create_coverage_table(to_db, from_db)
-create_count_table(to_db, from_db)
-
-# cursor = conn.cursor(dictionary=True)
-# # cursor.execute(f"SELECT MAX(`mac_contig_id`) FROM `hello_world`.`properties`")
-# cursor.execute(f"""
-#   SELECT
-#     `contig_id`,
-#     `non_tel_length`
-#   FROM `{to_db}`.`contig`
-#   WHERE `contig_id` BETWEEN {0} AND {1000}
-# """)
-# cursor.execute(f"""
-#   SELECT
-#     `contig_id`,
-#     `non_tel_length`
-#   FROM `{to_db}`.`contig`
-#   WHERE `contig_id` BETWEEN {0} AND {1000}
-# """)
-# x = cursor.fetchall()
-# cursor.execute(f"""
-#   INSERT INTO `{to_db}`.`tab`
-#     SELECT 123 AS `x` UNION ALL SELECT 345 AS `x`;
-# """)
-
-# conn.close()
+# GENES AND IES NEED TO BE DONE HERE
+# create_count_table(to_db, from_db)
+# create_alias_table(to_db, from_db)
+# insert_alias_contig(to_db)
+# insert_alias_gene(to_db)
+# insert_alias_file(
+#   to_db,
+#   "data/oxy_tri_jrb310_mac_2012_alias.tsv",
+#   "contig",
+#   "mac",
+# )
+# insert_alias_file(
+#   to_db,
+#   "data/oxy_tri_jrb310_mic_2014_alias.tsv",
+#   "contig",
+#   "mic",
+# )
+# create_variant_table(to_db)
+# insert_variant_file(to_db, "data/oxy_tri_jrb310_mac_2020_variant.tsv")
+# create_stats_table(to_db)
+create_protein_table(to_db)
+insert_protein_file(to_db, "data/Oxytricha_trifallax_022112_aa.tsv")
+# add_to_directory(
+#   "hello_world",
+#   "spacemonkey",
+#   "Super duper space monkey cowboy organism.",
+#   "Only the finest specimen of space monkey dna.",
+#   "hello_world",
+#   "my_assembly",
+#   "hello_world"
+# )
+# dump_table("hello_world", "variant", "variant.tsv")
