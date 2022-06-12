@@ -6,6 +6,7 @@ import mysql.connector
 import pandas as pd
 import numpy as np
 import collections
+import argparse
 
 import constants
 import common_utils
@@ -14,11 +15,12 @@ import mysql_utils
 import create_gene
 import create_ies
 
+
 def create_database(db: str):
   common_utils.log(f"create_database {db}")
   conn = mysql_utils.get_connection()
   cursor = conn.cursor()
-  cursor.execut(f"DROP DATABASE IF EXISTS `{db}`;")
+  cursor.execute(f"DROP DATABASE IF EXISTS `{db}`;")
   cursor.execute(f"CREATE DATABASE `{db}`;")
   cursor.close()
   conn.close()
@@ -644,8 +646,8 @@ def create_coverage_table(db_to: str, db_from: str):
   cursor.close()
   conn.close()
 
-def create_count_table(db_to: str, db_from: str):
-  common_utils.log(f"create_count_table {db_to} {db_from}")
+def create_count_table(db_to: str):
+  common_utils.log(f"create_count_table {db_to}")
 
   conn = mysql_utils.get_connection()
   cursor = conn.cursor()
@@ -1445,53 +1447,103 @@ def dump_table_all(db: str):
       os.path.join(constants.DATA_DIR, db, f"{table}.tsv"),
     )
 
-def create_all_oxytri_mac2012_mic2014(db_to: str, db_from: str):
-  create_name_temp_table(db_to, db_from, "Contig.*", "OXYTRI.*")
-  create_contig_table(db_to, db_from)
-  create_match_table(db_to, db_from)
-  create_pointer_table(db_to, db_from)
-  create_properties_table(db_to, db_from)
-  create_parameter_table(db_to, db_from)
-  create_coverage_table(db_to, db_from)
-  # create_gene.create_gene_table(db_to)
-  # create_gene.insert_gene_mac2012(db_to)
-  # create_gene.insert_gene_mic2014(db_to)
-  # create_ies.create_ies_table(db_to, "strict")
-  # create_ies.create_ies_table(db_to, "weak")
-  create_count_table(db_to, db_from)
-  create_alias_table(db_to, db_from)
-  insert_alias_contig(db_to)
-  insert_alias_gene(db_to)
-  insert_alias_file(
-    db_to,
-    constants.OXYTRI_MAC_2012_ALIAS,
-    "contig",
-    "mac",
-  )
-  insert_alias_file(
-    db_to,
-    constants.OXYTRI_MIC_2014_ALIAS,
-    "contig",
-    "mic",
-  )
-  create_variant_table(db_to)
-  create_stats_table(db_to)
-  create_protein_table(db_to)
-  insert_protein_file(db_to, constants.OXYTRI_MAC_2012_PROTEIN)
-  add_to_directory(
-    db_to,
-    "Oxytricha trifallax JRB310 (MAC 2013/MIC 2014)",
-    "Oxytricha trifallax JRB310 - SDRAP MDS/IES Annotation - MAC 2013 - MIC 2014",
-    "oxy_tri_jrb310",
-    "Only the finest specimen of space monkey dna.",
-    db_to,
-    "mac_2012,mic_2014",
-    "oxy_tri_jrb310_mac_2013_mic_2014",
-  )
-  dump_table_all(db_to)
+# def create_all_oxytri_mac2012_mic2014(db_to: str, db_from: str):
+#   create_name_temp_table(db_to, db_from, "Contig.*", "OXYTRI.*")
+#   create_contig_table(db_to, db_from)
+#   create_match_table(db_to, db_from)
+#   create_pointer_table(db_to, db_from)
+#   create_properties_table(db_to, db_from)
+#   create_parameter_table(db_to, db_from)
+#   create_coverage_table(db_to, db_from)
+#   create_gene.create_gene_table(db_to)
+#   create_gene.insert_gene_mac2012(db_to)
+#   create_gene.insert_gene_mic2014(db_to)
+#   create_ies.create_ies_table(db_to, "strict")
+#   create_ies.create_ies_table(db_to, "weak")
+#   create_count_table(db_to, db_from)
+#   create_alias_table(db_to)
+#   insert_alias_contig(db_to)
+#   insert_alias_gene(db_to)
+#   insert_alias_file(
+#     db_to,
+#     constants.OXYTRI_MAC_2012_ALIAS,
+#     "contig",
+#     "mac",
+#   )
+#   insert_alias_file(
+#     db_to,
+#     constants.OXYTRI_MIC_2014_ALIAS,
+#     "contig",
+#     "mic",
+#   )
+#   create_variant_table(db_to)
+#   create_stats_table(db_to)
+#   create_protein_table(db_to)
+#   insert_protein_file(db_to, constants.OXYTRI_MAC_2012_PROTEIN)
+#   add_to_directory(
+#     db_to,
+#     "Oxytricha trifallax JRB310 (MAC 2013/MIC 2014)",
+#     "Oxytricha trifallax JRB310 - SDRAP MDS/IES Annotation - MAC 2013 - MIC 2014",
+#     "oxy_tri_jrb310",
+#     db_to,
+#     "mac_2012,mic_2014",
+#     "oxy_tri_jrb310_mac_2013_mic_2014",
+#   )
+#   dump_table_all(db_to)
 
-def create_all_oxytri_mac2020_mic2014(db_to: str, db_from: str):
-  create_name_temp_table(db_to, db_from, "Contig.*", "OXYTRI.*")
+# def create_all_oxytri_mac2020_mic2014(db_to: str, db_from: str):
+#   create_name_temp_table(db_to, db_from, "Contig.*", "OXYTRI.*")
+#   create_contig_table(db_to, db_from)
+#   create_match_table(db_to, db_from)
+#   create_pointer_table(db_to, db_from)
+#   create_properties_table(db_to, db_from)
+#   create_parameter_table(db_to, db_from)
+#   create_coverage_table(db_to, db_from)
+#   create_gene.create_gene_table(db_to)
+#   create_gene.insert_gene_mac2012(db_to)
+#   create_gene.insert_gene_mic2014(db_to)
+#   create_ies.create_ies_table(db_to, "strict")
+#   create_ies.create_ies_table(db_to, "weak")
+#   create_count_table(db_to, db_from)
+#   create_alias_table(db_to, db_from)
+#   insert_alias_contig(db_to)
+#   insert_alias_gene(db_to)
+#   insert_alias_file(
+#     db_to,
+#     constants.OXYTRI_MAC_2020_ALIAS,
+#     "contig",
+#     "mac",
+#   )
+#   insert_alias_file(
+#     db_to,
+#     constants.OXYTRI_MIC_2014_ALIAS,
+#     "contig",
+#     "mic",
+#   )
+#   create_variant_table(db_to)
+#   insert_variant_file(db_to, constants.OXYTRI_MAC_2020_VARIANT)
+#   create_stats_table(db_to)
+#   create_protein_table(db_to)
+#   insert_protein_file(db_to, constants.OXYTRI_MAC_2020_PROTEIN)
+#   add_to_directory(
+#     db_to,
+#     "Oxytricha trifallax JRB310 (MAC 2019/MIC 2014)",
+#     "Oxytricha trifallax JRB310 - SDRAP MDS/IES Annotation - MAC 2019 - MIC 2014",
+#     "oxy_tri_jrb310",
+#     db_to,
+#     "mac_2020,mic_2014",
+#     "oxy_tri_jrb310_mac_2019_mic_2014",
+#   )
+#   dump_table_all(db_to)
+
+def create_all(db_to: str, db_from: str, preset: str):
+  create_database(db_to)
+  create_name_temp_table(
+    db_to,
+    db_from,
+    constants.PRESETS[preset].get("mac_name_regex", ".*"),
+    constants.PRESETS[preset].get("mic_name_regex", ".*"),
+  )
   create_contig_table(db_to, db_from)
   create_match_table(db_to, db_from)
   create_pointer_table(db_to, db_from)
@@ -1499,47 +1551,65 @@ def create_all_oxytri_mac2020_mic2014(db_to: str, db_from: str):
   create_parameter_table(db_to, db_from)
   create_coverage_table(db_to, db_from)
   create_gene.create_gene_table(db_to)
-  create_gene.insert_gene_mac2012(db_to)
-  create_gene.insert_gene_mic2014(db_to)
+  for file in constants.PRESETS[preset].get("gene_files", []):
+    create_gene.insert_gene_file(db_to, file)
   create_ies.create_ies_table(db_to, "strict")
   create_ies.create_ies_table(db_to, "weak")
-  create_count_table(db_to, db_from)
-  create_alias_table(db_to, db_from)
+  create_count_table(db_to)
+  create_alias_table(db_to)
   insert_alias_contig(db_to)
   insert_alias_gene(db_to)
-  insert_alias_file(
-    db_to,
-    constants.OXYTRI_MAC_2020_ALIAS,
-    "contig",
-    "mac",
-  )
-  insert_alias_file(
-    db_to,
-    constants.OXYTRI_MIC_2014_ALIAS,
-    "contig",
-    "mic",
-  )
+  for file in constants.PRESETS[preset].get("alias_files", []):
+    insert_alias_file(
+      db_to,
+      file["file"],
+      file["table"],
+      file["nucleus"],
+    )
   create_variant_table(db_to)
-  insert_variant_file(db_to, constants.OXYTRI_MAC_2020_VARIANT)
+  for file in constants.PRESETS[preset].get("variant_files", []):
+    insert_variant_file(db_to, file)
   create_stats_table(db_to)
   create_protein_table(db_to)
-  insert_protein_file(db_to, constants.OXYTRI_MAC_2020_PROTEIN)
+  for file in constants.PRESETS[preset].get("variant_files", []):
+    insert_variant_file(db_to, file)
   add_to_directory(
     db_to,
-    "Oxytricha trifallax JRB310 (MAC 2019/MIC 2014)",
-    "Oxytricha trifallax JRB310 - SDRAP MDS/IES Annotation - MAC 2019 - MIC 2014",
-    "oxy_tri_jrb310",
-    "Only the finest specimen of space monkey dna.",
+    constants.PRESETS[preset].get("name", db_to),
+    constants.PRESETS[preset].get("description", db_to),
+    constants.PRESETS[preset].get("organism", db_to),
     db_to,
-    "mac_2020,mic_2014",
-    "oxy_tri_jrb310_mac_2019_mic_2014",
+    constants.PRESETS[preset].get("organism", db_to),
+    constants.PRESETS[preset].get("url", db_to),
   )
   dump_table_all(db_to)
 
+def parse_args():
+  parser = argparse.ArgumentParser()
+  parser.add_argument(
+    "-o",
+    "--output_db",
+    help = "Name of the SQL database to write output data to.",
+  )
+  parser.add_argument(
+    "-i",
+    "--input_db",
+    help = "Name of the SQL database containing SDRAP data to use as input.",
+  )
+  parser.add_argument(
+    "-p",
+    "--preset",
+    choices = list(constants.PRESETS),
+    default = "none",
+  )
+  return parser.parse_args()
+
 if __name__ == "__main__":
-  db_from = "sdrap_oxy_mac2012_May_30_2022"
-  db_to = "hello_world"
-  create_all_oxytri_mac2012_mic2014(db_to, db_from)
+  # db_from = "sdrap_oxy_mac2012_May_30_2022"
+  # db_to = "mds_ies_db_data_5"
+  sys.argv += "-o mds_ies_db_data_5 -i sdrap_oxy_mac2012_May_30_2022 -p oxytri_mac2012_mic2014".split(" ")
+  args = parse_args()
+  create_all(args.output_db, args.input_db, args.preset)
 
 # Retest everything
 # create_name_temp_table(db_to, db_from, "Contig.*", "OXYTRI.*")

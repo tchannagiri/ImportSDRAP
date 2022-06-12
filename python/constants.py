@@ -5,11 +5,11 @@ SQL_BATCH_DOWNLOAD_ROWS = 10000
 
 DATA_DIR = "python/data"
 OXYTRI_MAC_2020_GENE_GFF = os.path.join(DATA_DIR, "O_trifallax_2020-upd3.gff3")
-OXYTRI_MAC_2020_GENE_TSV = os.path.join(DATA_DIR, "O_trifallax_2020-upd3.tsv")
+OXYTRI_MAC_2020_GENE_TSV = os.path.join(DATA_DIR, "O_trifallax_2020-upd3_gene.tsv")
 OXYTRI_MAC_2012_GENE_GFF = os.path.join(DATA_DIR, "Oxytricha_trifallax_022112.gff3")
-OXYTRI_MAC_2012_GENE_TSV = os.path.join(DATA_DIR, "Oxytricha_trifallax_022112.tsv")
+OXYTRI_MAC_2012_GENE_TSV = os.path.join(DATA_DIR, "Oxytricha_trifallax_022112_gene.tsv")
 OXYTRI_MIC_2014_GENE_GFF = os.path.join(DATA_DIR, "oxy_tri_jrb310_mic_2014.gff")
-OXYTRI_MIC_2014_GENE_TSV = os.path.join(DATA_DIR, "oxy_tri_jrb310_mic_2014.tsv")
+OXYTRI_MIC_2014_GENE_TSV = os.path.join(DATA_DIR, "oxy_tri_jrb310_mic_2014_gene.tsv")
 OXYTRI_MIC_2014_GENE_HIGHTXN_GFF = os.path.join(DATA_DIR, "tglo_final_hightxn.gff")
 OXYTRI_MIC_2014_GENE_LOWXN_GFF = os.path.join(DATA_DIR, "tglo_final_lowtxn.gff")
 
@@ -39,3 +39,54 @@ TABLE_DUMP_LIST = [
   "stats",
   "variant",
 ]
+
+PRESETS = {
+  "none": {
+    "mac_name_regex": ".*", 
+    "mic_name_regex": ".*", 
+  },
+  "oxytri_mac2012_mic2014": {
+    "mac_name_regex": "Contig.*", 
+    "mic_name_regex": "OXYTRI.*",
+    "gene_files": [
+      OXYTRI_MAC_2012_GENE_TSV,
+      OXYTRI_MIC_2014_GENE_TSV,
+    ],
+    "alias_files": [
+      {"file": OXYTRI_MAC_2012_ALIAS, "table": "contig", "nucleus": "mac"},
+      {"file": OXYTRI_MIC_2014_ALIAS, "table": "contig", "nucleus": "mic"},
+    ],
+    "protein_files": [
+      OXYTRI_MAC_2012_PROTEIN
+    ],
+    "name": "Oxytricha trifallax JRB310 (MAC 2013/MIC 2014)",
+    "description": "Oxytricha trifallax JRB310 - SDRAP MDS/IES Annotation - MAC 2013 - MIC 2014",
+    "organism": "oxy_tri_jrb310",
+    "assembly": "mac_2012,mic_2014",
+    "url": "oxy_tri_jrb310_mac_2013_mic_2014",
+  },
+  "oxytri_mac2020_mic2014": {
+    "mac_name_regex": "Contig.*", 
+    "mic_name_regex": "OXYTRI.*",
+    "gene_files": [
+      OXYTRI_MAC_2020_GENE_TSV,
+      OXYTRI_MIC_2014_GENE_TSV,
+    ],
+    "alias_files": [
+      {"file": OXYTRI_MAC_2020_ALIAS, "table": "contig", "nucleus": "mac"},
+      {"file": OXYTRI_MIC_2014_ALIAS, "table": "contig", "nucleus": "mic"},
+    ],
+    "variant_files": [
+      OXYTRI_MAC_2020_VARIANT
+    ],
+    "protein_files": [
+      OXYTRI_MAC_2020_PROTEIN
+    ],
+    "name": "Oxytricha trifallax JRB310 (MAC 2019/MIC 2014)",
+    "description": "Oxytricha trifallax JRB310 - SDRAP MDS/IES Annotation - MAC 2019 - MIC 2014",
+    "organism": "oxy_tri_jrb310",
+    "assembly": "mac_2020,mic_2014",
+    "url": "oxy_tri_jrb310_mac_2019_mic_2014",
+  },
+}
+
