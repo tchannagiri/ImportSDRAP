@@ -12,7 +12,6 @@ import common_utils
 import interval_utils
 import mysql_utils
 
-
 def create_database(db: str):
   common_utils.log(f"create_database {db}")
   conn = mysql_utils.get_connection()

@@ -7,14 +7,16 @@ import constants
 import common_utils
 import mysql_utils
 
-def create_gene_table(to_db: str, file: str):
+def create_gene_table(db: str):
+  common_utils.log(f"create_gene_table {db}")
+
   conn = mysql_utils.get_connection()
   cursor = conn.cursor(dictionary=True)
 
-  cursor.execute(f"DROP TABLE IF EXISTS `{to_db}`.`gene`;")
+  cursor.execute(f"DROP TABLE IF EXISTS `{db}`.`gene`;")
   cursor.execute(
     f"""
-    CREATE TABLE `{to_db}`.`gene` (
+    CREATE TABLE `{db}`.`gene` (
       `gene_id` int(11) NOT NULL AUTO_INCREMENT COMMENT 'Primary index of the `gene` table',
       `contig_id` int(10) NOT NULL COMMENT 'ID of the parent contig in the `contig` table',
       `contig_name` varchar(50) NOT NULL COMMENT 'Name of the parent contig',
@@ -39,7 +41,16 @@ def create_gene_table(to_db: str, file: str):
     """
   )
 
-  gene_data = common_utils.read_tsv(file)
+  cursor.close()
+  conn.close()
+
+def insert_gene_file(to_db: str, file: str):
+  common_utils.log(f"insert_gene_file {to_db} {file}")
+
+  conn = mysql_utils.get_connection()
+  cursor = conn.cursor(dictionary=True)
+
+  data = common_utils.read_tsv(file)
 
   cursor.execute(
     f"""
@@ -53,16 +64,15 @@ def create_gene_table(to_db: str, file: str):
 
   contig_data = pd.DataFrame.from_records(cursor.fetchall())
   
-
-  gene_data = pd.merge(
-    gene_data,
+  data = pd.merge(
+    data,
     contig_data,
     how = 'left',
     on = ['contig_name', 'contig_nucleus'],
   )
 
   mysql_utils.upload_in_chunks(
-    gene_data,
+    data,
     [
       "contig_id",
       "contig_name",
@@ -86,47 +96,16 @@ def create_gene_table(to_db: str, file: str):
     "gene",
     constants.SQL_BATCH_UPLOAD_ROWS,
   )
-  # for i in range(0, data.shape[0], constants.SQL_BATCH_UPLOAD_ROWS):
-  #   common_utils.log(f"{i} / {data.shape[0]}")
-  #   values = mysql_utils.make_sql_values(
-  #     data.loc[
-  #       i : (i + constants.SQL_BATCH_UPLOAD_ROWS - 1),
-  #       ["id", "name", "alias", "table", "type"]
-  #     ]
-  #   )
-  #   cursor.execute(
-  #     f"""
-  #     INSERT INTO `gene`
-  #     (
-  #       `contig_id`,
-  #       `contig_name`,
-  #       `contig_nucleus`,
-  #       `source`,
-  #       `type`,
-  #       `start`,
-  #       `end`,
-  #       `length`,
-  #       `score`,
-  #       `strand`,
-  #       `phase`,
-  #       `attr_id`,
-  #       `attr_parent`,
-  #       `attr_name`,
-  #       `attr_note`,
-  #       `attr_parent_gene`
-  #     )
-  #     VALUES {values}
-  #     """
-  #   )
 
-def create_gene_table_2012_mac(to_db: str):
-  create_gene_table(to_db, constants.OXYTRI_MAC_2012_GENE_TSV)
+  cursor.close()
+  conn.close()
 
-def create_gene_table_2020_mac(to_db: str):
-  create_gene_table(to_db, constants.OXYTRI_MAC_2020_GENE_TSV)
+def create_gene_mac2012(db: str):
+  insert_gene_file(db, constants.OXYTRI_MAC_2012_GENE_TSV)
 
-def create_gene_table_2014_mic(to_db: str):
-  create_gene_table(to_db, constants.OXYTRI_MIC_2014_GENE_TSV)
+def insert_gene_mac2020(db: str):
+  insert_gene_file(db, constants.OXYTRI_MAC_2020_GENE_TSV)
 
+def insert_gene_mic2014(db: str):
+  insert_gene_file(db, constants.OXYTRI_MIC_2014_GENE_TSV)
 
-create_gene_table_2012_mac("hello_world")
