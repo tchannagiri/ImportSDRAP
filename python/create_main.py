@@ -1570,8 +1570,6 @@ def create_all(db_to: str, db_from: str, preset: str):
     insert_variant_file(db_to, file)
   create_stats_table(db_to)
   create_protein_table(db_to)
-  for file in constants.PRESETS[preset].get("variant_files", []):
-    insert_variant_file(db_to, file)
   add_to_directory(
     db_to,
     constants.PRESETS[preset].get("name", db_to),
