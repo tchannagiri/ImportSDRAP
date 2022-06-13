@@ -14,7 +14,7 @@ def read_tsv(file: str, **args) -> pd.DataFrame:
 
 def write_tsv(data: pd.DataFrame, file: str, **args):
   make_parent_dir(file)
-  return data.to_csv(file, sep="\t", index=False, quoting=csv.QUOTE_NONNUMERIC, **args)
+  return data.to_csv(file, sep="\t", index=False, quoting=csv.QUOTE_ALL, **args)
 
 def get_contig_info(cursor, db: str):
   cursor.execute(
