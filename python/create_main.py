@@ -1604,50 +1604,8 @@ def parse_args():
   return parser.parse_args()
 
 if __name__ == "__main__":
-  # db_from = "sdrap_oxy_mac2012_May_30_2022"
-  # db_to = "mds_ies_db_data_5"
-  sys.argv += "-o mds_ies_db_data_5 -i sdrap_oxy_mac2012_May_30_2022 -p oxytri_mac2012_mic2014".split(" ")
   args = parse_args()
   create_all(args.output_db, args.input_db, args.preset)
 
-# Retest everything
-# create_name_temp_table(db_to, db_from, "Contig.*", "OXYTRI.*")
-# create_alias_table(db_to, db_from, ["main\\oxy_tri_jrb310_mac_2012_alias.csv", "main\\oxy_tri_jrb310_mic_2014_alias.csv"])
-# create_contig_table(db_to, db_from)
-# create_match_table(db_to, db_from)
-# create_pointer_table(db_to, db_from)
-# create_properties_table(db_to, db_from)
-# create_parameter_table(db_to, db_from)
-# create_coverage_table(db_to, db_from)
-# GENES AND IES NEED TO BE DONE HERE
-# create_count_table(db_to, db_from)
-# create_alias_table(db_to, db_from)
-# insert_alias_contig(db_to)
-# insert_alias_gene(db_to)
-# insert_alias_file(
-#   db_to,
-#   "data/oxy_tri_jrb310_mac_2012_alias.tsv",
-#   "contig",
-#   "mac",
-# )
-# insert_alias_file(
-#   db_to,
-#   "data/oxy_tri_jrb310_mic_2014_alias.tsv",
-#   "contig",
-#   "mic",
-# )
-# create_variant_table(db_to)
-# insert_variant_file(db_to, "data/oxy_tri_jrb310_mac_2020_variant.tsv")
-# create_stats_table(db_to)
-# create_protein_table(db_to)
-# insert_protein_file(db_to, "data/Oxytricha_trifallax_022112_aa.tsv")
-# add_to_directory(
-#   "hello_world",
-#   "spacemonkey",
-#   "Super duper space monkey cowboy organism.",
-#   "Only the finest specimen of space monkey dna.",
-#   "hello_world",
-#   "my_assembly",
-#   "hello_world"
-# )
-# dump_table("hello_world", "variant", "variant.tsv")
+# -o mds_ies_db_data_5 -i sdrap_oxy_mac2012_May_30_2022 -p oxytri_mac2012_mic2014
+# -o mds_ies_db_data_6 -i sdrap_oxy_mac2020_May_30_2022 -p oxytri_mac2020_mic2014
