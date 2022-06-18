@@ -1571,13 +1571,13 @@ def create_all(db_to: str, db_from: str, preset: str):
   create_stats_table(db_to)
   create_protein_table(db_to)
   add_to_directory(
-    db_to,
-    constants.PRESETS[preset].get("name", db_to),
-    constants.PRESETS[preset].get("description", db_to),
-    constants.PRESETS[preset].get("organism", db_to),
-    db_to,
-    constants.PRESETS[preset].get("organism", db_to),
-    constants.PRESETS[preset].get("url", db_to),
+    db = db_to,
+    name = constants.PRESETS[preset].get("name", db_to),
+    description = constants.PRESETS[preset].get("description", db_to),
+    organisn = constants.PRESETS[preset].get("organism", db_to),
+    download_dir = db_to,
+    assembly = constants.PRESETS[preset].get("assembly", db_to),
+    url = constants.PRESETS[preset].get("url", db_to),
   )
   dump_table_all(db_to)
 
