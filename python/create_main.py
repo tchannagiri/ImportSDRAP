@@ -1607,5 +1607,5 @@ if __name__ == "__main__":
 
 # -o mds_ies_db_data_5 -i sdrap_oxy_mac2012_May_30_2022 -p oxytri_mac2012_mic2014
 # -o mds_ies_db_data_6 -i sdrap_oxy_mac2020_Jun_13_2022 -p oxytri_mac2020_mic2014
-# -o mds_ies_db_data_7 -i sdrap_ewoo_11032020_pid95_add90
-# -o mds_ies_db_data_8 -i sdrap_tet_10272020_pid95_add90
+# -o mds_ies_db_data_7 -i sdrap_ewoo_11032020_pid95_add90 -p ewoo
+# -o mds_ies_db_data_8 -i sdrap_tet_10272020_pid95_add90 -p tet
