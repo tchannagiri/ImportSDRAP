@@ -1524,7 +1524,7 @@ def create_all(db_to: str, db_from: str, preset: str):
         <mds_ies_db> root to be available for download.
       3. The genome FASTA and GFF files must be copied to the appropriate directory in the
         <mds_ies_db> root to be available for download.
-      3. The `publish` parameter in the database directory must be set to TRUE for the
+      4. The `publish` parameter in the database directory must be set to TRUE for the
          database to be visible on <mds_ies_db>.
     """
   )
