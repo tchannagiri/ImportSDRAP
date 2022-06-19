@@ -1493,6 +1493,7 @@ def create_all(db_to: str, db_from: str, preset: str):
     url = constants.PRESETS[preset].get("url", db_to),
   )
   dump_table_all(db_to)
+  drop_temp_tables(db_to)
 
 def parse_args():
   parser = argparse.ArgumentParser()
