@@ -64,6 +64,10 @@ PRESETS = {
     "organism": "oxy_tri_jrb310",
     "assembly": "mac_2012,mic_2014",
     "url": "oxy_tri_jrb310_mac_2013_mic_2014",
+    "genus": "Oxytricha",
+    "species": "Oxytricha trifallax",
+    "strain": "JRB310",
+    "taxonomy_id": "1172189",
   },
   "oxytri_mac2020_mic2014": {
     "mac_name_regex": "Contig.*", 
@@ -87,6 +91,10 @@ PRESETS = {
     "organism": "oxy_tri_jrb310",
     "assembly": "mac_2020,mic_2014",
     "url": "oxy_tri_jrb310_mac_2019_mic_2014",
+    "genus": "Oxytricha",
+    "species": "Oxytricha trifallax",
+    "strain": "JRB310",
+    "taxonomy_id": "1172189",
   },
   "tet": {
     "mac_name_regex": ".*", 
@@ -100,6 +108,10 @@ PRESETS = {
     "organism": "tet_sp_sej2015",
     "assembly": "mac_2015,mic_2022",
     "url": "tet_sp_sej2015_mac_2015_mic_2022",
+    "genus": "Tetmemena",
+    "species": "Tetmemena sp.",
+    "strain": "SeJ-2015",
+    "taxonomy_id": "200606",
   },
   "ewoo": {
     "mac_name_regex": ".*", 
@@ -113,6 +125,10 @@ PRESETS = {
     "organism": "eup_woo_iz01",
     "assembly": "mac_2022,mic_2022",
     "url": "eup_woo_iz01_mac_2022_mic_2022",
+    "genus": "Euplotes",
+    "species": "Euplotes woodruffi",
+    "strain": "Iz01",
+    "taxonomy_id": "5942",
   },
 }
 
