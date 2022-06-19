@@ -1362,14 +1362,14 @@ def add_to_directory(
   url: str,
 ):
   common_utils.log(
-    "add_to_directory" + " " +
-    db + " " +
-    name + " " +
-    description + " " +
-    organism + " " +
-    download_dir + " " +
-    assembly + " " +
-    url
+    "add_to_directory" + "\n" +
+    "  " + db + "\n" +
+    "  " + name + "\n" +
+    "  " + description + "\n" +
+    "  " + organism + "\n" +
+    "  " + download_dir + "\n" +
+    "  " + assembly + "\n" +
+    "  " + url
   )
 
   conn = mysql_utils.get_connection()
