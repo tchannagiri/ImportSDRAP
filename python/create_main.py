@@ -1580,6 +1580,18 @@ def parse_args():
     ),
     required = True,
   )
+  parser.add_argument(
+    "--port",
+    default = mysql_utils.PORT,
+    help = (
+      "Port to use for connecting to the MYSQL server." +
+      " If running on the main server should be kept at the default." +
+      " If running on a local machine, should be the port which is forwarded" +
+      " to the main server. If additional MYSQL settings must be configured" +
+      " the the get_connection() function in mysql_utils.py should be modified" +
+      " directly."
+    ),
+  )
   args = parser.parse_args()
   if "all" in args.stages:
     args.stages = constants.STAGES
@@ -1587,10 +1599,12 @@ def parse_args():
 
 if __name__ == "__main__":
   args = parse_args()
+  mysql_utils.set_port(args.port)
   create_all(args.output_db, args.input_db, args.preset, args.stages)
 
-# Example commands for creating the current databases
-# python python/create_main.py -o mds_ies_db_data_5 -i sdrap_oxy_mac2012_May_30_2022 -p oxytri_mac2012_mic2014 -s protein
-# python python/create_main.py -o mds_ies_db_data_6 -i sdrap_oxy_mac2020_Jun_13_2022 -p oxytri_mac2020_mic2014 -s protein
-# python python/create_main.py -o mds_ies_db_data_7 -i sdrap_ewoo_11032020_pid95_add90 -p ewoo -s protein
-# python python/create_main.py -o mds_ies_db_data_8 -i sdrap_tet_10272020_pid95_add90 -p tet -s protein
+# Example commands for creating the current databases for only the protein stage
+# with port 8888 on local machine SSH forwarded to the main server.
+# python python/create_main.py -o mds_ies_db_data_5 -i sdrap_oxy_mac2012_May_30_2022 -p oxytri_mac2012_mic2014 -s protein --port 8888
+# python python/create_main.py -o mds_ies_db_data_6 -i sdrap_oxy_mac2020_Jun_13_2022 -p oxytri_mac2020_mic2014 -s protein --port 8888
+# python python/create_main.py -o mds_ies_db_data_7 -i sdrap_ewoo_11032020_pid95_add90 -p ewoo -s protein --port 8888
+# python python/create_main.py -o mds_ies_db_data_8 -i sdrap_tet_10272020_pid95_add90 -p tet -s protein --port 8888

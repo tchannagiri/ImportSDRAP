@@ -1,13 +1,23 @@
-import os
 import pandas as pd
 
 import common_utils
 import mysql.connector
 
+# This is the default MYSQL port for running on the server.
+# If running on a local machine with ports forwarded to the main
+# server, the appropriate port must be passed on the command line.
+# If the host, user, or password must be changed they should be changed
+# in the get_connection() function below.
+PORT = "3306"
+
+def set_port(new_port: str):
+  global PORT
+  PORT = new_port
+
 def get_connection() -> mysql.connector.MySQLConnection:
   conn = mysql.connector.connect(
     host = "localhost",
-    port = "8888" if os.name == "nt" else "3306", # FIXME: HACK FOR TESTING ON SERVER, MAKE THIS CONFIGURABLE FROM COMMAND LINE
+    port = PORT,
     user = "web",
     password = "RZhRwsau6HZrMUXf",
     autocommit = True,

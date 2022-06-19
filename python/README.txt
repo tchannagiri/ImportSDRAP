@@ -17,3 +17,7 @@ Note that some of the files, such as those for gene annotations, proteins, varia
 Old PHP code
 ------------
 The php_old directory is the first version of the import script intended to be run on the main server, or on a local server such as WAMP by forwarding MYSQL ports to the main server. It is kept for now incase it needs to be used for reference.
+
+Connection to MYSQL
+-------------------
+This script is easiert to run directly on the server. However, to run from a local machine SSH port forwading must be used in order to connect with the main MYSQL server. The port used by the script can be configure on the command line. If additional parameters for connected must be change, they should be directly modified in the get_connection() funciton in mysql_utils.py.
