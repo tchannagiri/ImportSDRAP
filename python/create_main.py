@@ -1385,7 +1385,8 @@ def add_to_directory(
       `organism`,
       `download_dir`,
       `assembly`,
-      `url`
+      `url`,
+      `publish`
     )
     VALUES
     (
@@ -1395,7 +1396,8 @@ def add_to_directory(
       '{organism}',
       '{download_dir}',
       '{assembly}',
-      '{url}'
+      '{url}',
+      FALSE
     );
     """
   )
