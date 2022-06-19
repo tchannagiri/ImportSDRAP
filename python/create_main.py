@@ -1536,45 +1536,45 @@ def dump_table_all(db: str):
 #   dump_table_all(db_to)
 
 def create_all(db_to: str, db_from: str, preset: str):
-  create_database(db_to)
-  create_name_temp_table(
-    db_to,
-    db_from,
-    constants.PRESETS[preset].get("mac_name_regex", ".*"),
-    constants.PRESETS[preset].get("mic_name_regex", ".*"),
-  )
-  create_contig_table(db_to, db_from)
-  create_match_table(db_to, db_from)
-  create_pointer_table(db_to, db_from)
-  create_properties_table(db_to, db_from)
-  create_parameter_table(db_to, db_from)
-  create_coverage_table(db_to, db_from)
-  create_gene.create_gene_table(db_to)
-  for file in constants.PRESETS[preset].get("gene_files", []):
-    create_gene.insert_gene_file(db_to, file)
-  create_ies.create_ies_table(db_to, "strict")
-  create_ies.create_ies_table(db_to, "weak")
-  create_count_table(db_to)
-  create_alias_table(db_to)
-  insert_alias_contig(db_to)
-  insert_alias_gene(db_to)
-  for file in constants.PRESETS[preset].get("alias_files", []):
-    insert_alias_file(
-      db_to,
-      file["file"],
-      file["table"],
-      file["nucleus"],
-    )
-  create_variant_table(db_to)
-  for file in constants.PRESETS[preset].get("variant_files", []):
-    insert_variant_file(db_to, file)
-  create_stats_table(db_to)
-  create_protein_table(db_to)
+  # create_database(db_to)
+  # create_name_temp_table(
+  #   db_to,
+  #   db_from,
+  #   constants.PRESETS[preset].get("mac_name_regex", ".*"),
+  #   constants.PRESETS[preset].get("mic_name_regex", ".*"),
+  # )
+  # create_contig_table(db_to, db_from)
+  # create_match_table(db_to, db_from)
+  # create_pointer_table(db_to, db_from)
+  # create_properties_table(db_to, db_from)
+  # create_parameter_table(db_to, db_from)
+  # create_coverage_table(db_to, db_from)
+  # create_gene.create_gene_table(db_to)
+  # for file in constants.PRESETS[preset].get("gene_files", []):
+  #   create_gene.insert_gene_file(db_to, file)
+  # create_ies.create_ies_table(db_to, "strict")
+  # create_ies.create_ies_table(db_to, "weak")
+  # create_count_table(db_to)
+  # create_alias_table(db_to)
+  # insert_alias_contig(db_to)
+  # insert_alias_gene(db_to)
+  # for file in constants.PRESETS[preset].get("alias_files", []):
+  #   insert_alias_file(
+  #     db_to,
+  #     file["file"],
+  #     file["table"],
+  #     file["nucleus"],
+  #   )
+  # create_variant_table(db_to)
+  # for file in constants.PRESETS[preset].get("variant_files", []):
+  #   insert_variant_file(db_to, file)
+  # create_stats_table(db_to)
+  # create_protein_table(db_to)
   add_to_directory(
     db = db_to,
     name = constants.PRESETS[preset].get("name", db_to),
     description = constants.PRESETS[preset].get("description", db_to),
-    organisn = constants.PRESETS[preset].get("organism", db_to),
+    organism = constants.PRESETS[preset].get("organism", db_to),
     download_dir = db_to,
     assembly = constants.PRESETS[preset].get("assembly", db_to),
     url = constants.PRESETS[preset].get("url", db_to),
