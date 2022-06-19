@@ -758,7 +758,7 @@ def create_count_table(db_to: str):
       b_nuc = "mic"
     elif i == 1:
       a_nuc = "mic"
-      b_nuc = "mic"
+      b_nuc = "mac"
     else:
       raise Exception("Impossible.")
 
@@ -1464,68 +1464,88 @@ def dump_table_all(db: str):
       os.path.join(constants.DATA_DIR, db, f"{table}.tsv"),
     )
 
-def create_all(db_to: str, db_from: str, preset: str):
-  create_database(db_to)
-  create_name_temp_table(
-    db_to,
-    db_from,
-    constants.PRESETS[preset].get("mac_name_regex", ".*"),
-    constants.PRESETS[preset].get("mic_name_regex", ".*"),
-  )
-  create_contig_table(db_to, db_from)
-  create_match_table(db_to, db_from)
-  create_pointer_table(db_to, db_from)
-  create_properties_table(db_to, db_from)
-  create_parameter_table(db_to, db_from)
-  create_coverage_table(db_to, db_from)
-  create_gene.create_gene_table(db_to)
-  for file in constants.PRESETS[preset].get("gene_files", []):
-    create_gene.insert_gene_file(db_to, file)
-  create_ies.create_ies_table(db_to, "strict")
-  create_ies.create_ies_table(db_to, "weak")
-  create_count_table(db_to)
-  create_alias_table(db_to)
-  insert_alias_contig(db_to)
-  insert_alias_gene(db_to)
-  for file in constants.PRESETS[preset].get("alias_files", []):
-    insert_alias_file(
+def create_all(db_to: str, db_from: str, preset: str, stages: list[str]):
+  if "create" in stages:
+    create_database(db_to)
+  if "contig" in stages:
+    create_name_temp_table(
       db_to,
-      file["file"],
-      file["table"],
-      file["nucleus"],
+      db_from,
+      constants.PRESETS[preset].get("mac_name_regex", ".*"),
+      constants.PRESETS[preset].get("mic_name_regex", ".*"),
     )
-  create_variant_table(db_to)
-  for file in constants.PRESETS[preset].get("variant_files", []):
-    insert_variant_file(db_to, file)
-  create_stats_table(db_to)
-  create_protein_table(db_to)
-  add_to_directory(
-    db = db_to,
-    name = constants.PRESETS[preset].get("name", db_to),
-    description = constants.PRESETS[preset].get("description", db_to),
-    organism = constants.PRESETS[preset].get("organism", db_to),
-    download_dir = db_to,
-    assembly = constants.PRESETS[preset].get("assembly", db_to),
-    url = constants.PRESETS[preset].get("url", db_to),
-    genus = constants.PRESETS[preset].get("genus", db_to),
-    species = constants.PRESETS[preset].get("species", db_to),
-    strain = constants.PRESETS[preset].get("strain", db_to),
-    taxonomy_id = constants.PRESETS[preset].get("taxonomy_id", db_to),
-  )
-  dump_table_all(db_to)
-  drop_temp_tables(db_to)
+    create_contig_table(db_to, db_from)
+  if "match" in stages:
+    create_match_table(db_to, db_from)
+  if "pointer" in stages:
+    create_pointer_table(db_to, db_from)
+  if "properties" in stages:
+    create_properties_table(db_to, db_from)
+  if "parameter" in stages:
+    create_parameter_table(db_to, db_from)
+  if "coverage" in stages:
+    create_coverage_table(db_to, db_from)
+  if "gene" in stages:
+    create_gene.create_gene_table(db_to)
+    for file in constants.PRESETS[preset].get("gene_files", []):
+      create_gene.insert_gene_file(db_to, file)
+  if "ies_strict" in stages:
+    create_ies.create_ies_table(db_to, "strict")
+  if "ies_weak" in stages:
+    create_ies.create_ies_table(db_to, "weak")
+  if "count" in stages:
+    create_count_table(db_to)
+  if "alias" in stages:
+    create_alias_table(db_to)
+    insert_alias_contig(db_to)
+    insert_alias_gene(db_to)
+    for file in constants.PRESETS[preset].get("alias_files", []):
+      insert_alias_file(
+        db_to,
+        file["file"],
+        file["table"],
+        file["nucleus"],
+      )
+  if "variant" in stages:
+    create_variant_table(db_to)
+    for file in constants.PRESETS[preset].get("variant_files", []):
+      insert_variant_file(db_to, file)
+  if "stats" in stages:
+    create_stats_table(db_to)
+  if "protein" in stages:
+    create_protein_table(db_to)
+    for file in constants.PRESETS[preset].get("protein_files", []):
+      insert_protein_file(db_to, file)
+  if "directory" in stages:
+    add_to_directory(
+      db = db_to,
+      name = constants.PRESETS[preset].get("name", db_to),
+      description = constants.PRESETS[preset].get("description", db_to),
+      organism = constants.PRESETS[preset].get("organism", db_to),
+      download_dir = db_to,
+      assembly = constants.PRESETS[preset].get("assembly", db_to),
+      url = constants.PRESETS[preset].get("url", db_to),
+      genus = constants.PRESETS[preset].get("genus", db_to),
+      species = constants.PRESETS[preset].get("species", db_to),
+      strain = constants.PRESETS[preset].get("strain", db_to),
+      taxonomy_id = constants.PRESETS[preset].get("taxonomy_id", db_to),
+    )
+  if "dump" in stages:
+    dump_table_all(db_to)
+  if "drop_temp" in stages:
+    drop_temp_tables(db_to)
   common_utils.log(
     f"""
-    The database has been imported to `{db_to}` from `{db_from}`.
-    In order to complete the installation of the database on <mds_ies_db>,
-      1. The dumped database files must be copied to the appropriate directory in the
-        <mds_ies_db> root to be available for download.
-      2. The SDRAP annotation files must be copied to the appropriate directory in the
-        <mds_ies_db> root to be available for download.
-      3. The genome FASTA and GFF files must be copied to the appropriate directory in the
-        <mds_ies_db> root to be available for download.
-      4. The `publish` parameter in the database directory must be set to TRUE for the
-         database to be visible on <mds_ies_db>.
+The database has been imported to `{db_to}` from `{db_from}`.
+In order to complete the installation of the database on <mds_ies_db>,
+  1. The dumped database files must be copied to the appropriate directory in the
+    <mds_ies_db> root to be available for download.
+  2. The SDRAP annotation files must be copied to the appropriate directory in the
+    <mds_ies_db> root to be available for download.
+  3. The genome FASTA and GFF files must be copied to the appropriate directory in the
+    <mds_ies_db> root to be available for download.
+  4. The `publish` parameter in the database directory must be set to TRUE for the
+      database to be visible on <mds_ies_db>.
     """
   )
 
@@ -1546,14 +1566,31 @@ def parse_args():
     "--preset",
     choices = list(constants.PRESETS),
     default = "none",
+    help = "Preset to use for determining data such as genes, proteins, variants, aliases, and metadata."
   )
-  return parser.parse_args()
+  parser.add_argument(
+    "-s",
+    "--stages",
+    nargs = "+",
+    choices = constants.STAGES,
+    help = (
+      "Which stages in the import to carry out." +
+      " Useful if restarting an import that failed at a certain stage." +
+      " Specify 'all' to do all stages."
+    ),
+    required = True,
+  )
+  args = parser.parse_args()
+  if "all" in args.stages:
+    args.stages = constants.STAGES
+  return args
 
 if __name__ == "__main__":
   args = parse_args()
-  create_all(args.output_db, args.input_db, args.preset)
+  create_all(args.output_db, args.input_db, args.preset, args.stages)
 
-# -o mds_ies_db_data_5 -i sdrap_oxy_mac2012_May_30_2022 -p oxytri_mac2012_mic2014
-# -o mds_ies_db_data_6 -i sdrap_oxy_mac2020_Jun_13_2022 -p oxytri_mac2020_mic2014
-# -o mds_ies_db_data_7 -i sdrap_ewoo_11032020_pid95_add90 -p ewoo
-# -o mds_ies_db_data_8 -i sdrap_tet_10272020_pid95_add90 -p tet
+# Example commands for creating the current databases
+# python python/create_main.py -o mds_ies_db_data_5 -i sdrap_oxy_mac2012_May_30_2022 -p oxytri_mac2012_mic2014 -s protein
+# python python/create_main.py -o mds_ies_db_data_6 -i sdrap_oxy_mac2020_Jun_13_2022 -p oxytri_mac2020_mic2014 -s protein
+# python python/create_main.py -o mds_ies_db_data_7 -i sdrap_ewoo_11032020_pid95_add90 -p ewoo -s protein
+# python python/create_main.py -o mds_ies_db_data_8 -i sdrap_tet_10272020_pid95_add90 -p tet -s protein

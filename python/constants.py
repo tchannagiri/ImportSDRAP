@@ -132,3 +132,24 @@ PRESETS = {
   },
 }
 
+STAGES = [
+  "all",
+  "create",
+  "contig",
+  "match",
+  "pointer",
+  "properties",
+  "parameter",
+  "coverage",
+  "gene",
+  "ies_strict",
+  "ies_weak",
+  "count",
+  "alias",
+  "variant",
+  "stats",
+  "protein",
+  "directory",
+  "dump",
+  "drop_temp",
+]
