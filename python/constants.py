@@ -51,8 +51,10 @@ PRESETS = {
     "mac_name_regex": "Contig.*", 
     "mic_name_regex": "OXYTRI.*",
     "gene_files": [
-      OXYTRI_MAC_2012_GENE_TSV,
+      OXYTRI_MAC_2020_GENE_TSV,
       OXYTRI_MIC_2014_GENE_TSV,
+      OXYTRI_MIC_2014_GENE_HIGHTXN_TSV,
+      OXYTRI_MIC_2014_GENE_LOWTXN_TSV,
     ],
     "alias_files": [
       {"file": OXYTRI_MAC_2012_ALIAS, "table": "contig", "nucleus": "mac"},
@@ -77,6 +79,8 @@ PRESETS = {
     "gene_files": [
       OXYTRI_MAC_2020_GENE_TSV,
       OXYTRI_MIC_2014_GENE_TSV,
+      OXYTRI_MIC_2014_GENE_HIGHTXN_TSV,
+      OXYTRI_MIC_2014_GENE_LOWTXN_TSV,
     ],
     "alias_files": [
       {"file": OXYTRI_MAC_2020_ALIAS, "table": "contig", "nucleus": "mac"},
