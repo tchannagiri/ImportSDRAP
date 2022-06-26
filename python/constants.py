@@ -11,7 +11,9 @@ OXYTRI_MAC_2012_GENE_TSV = os.path.join(DATA_DIR, "Oxytricha_trifallax_022112_ge
 OXYTRI_MIC_2014_GENE_GFF = os.path.join(DATA_DIR, "oxy_tri_jrb310_mic_2014.gff")
 OXYTRI_MIC_2014_GENE_TSV = os.path.join(DATA_DIR, "oxy_tri_jrb310_mic_2014_gene.tsv")
 OXYTRI_MIC_2014_GENE_HIGHTXN_GFF = os.path.join(DATA_DIR, "tglo_final_hightxn.gff")
-OXYTRI_MIC_2014_GENE_LOWXN_GFF = os.path.join(DATA_DIR, "tglo_final_lowtxn.gff")
+OXYTRI_MIC_2014_GENE_HIGHTXN_TSV = os.path.join(DATA_DIR, "tglo_final_hightxn.tsv")
+OXYTRI_MIC_2014_GENE_LOWTXN_GFF = os.path.join(DATA_DIR, "tglo_final_lowtxn.gff")
+OXYTRI_MIC_2014_GENE_LOWTXN_TSV = os.path.join(DATA_DIR, "tglo_final_lowtxn.tsv")
 
 OXYTRI_MAC_2012_ALIAS = os.path.join(DATA_DIR, "oxy_tri_jrb310_mac_2012_alias.tsv")
 OXYTRI_MAC_2020_ALIAS = os.path.join(DATA_DIR, "oxy_tri_jrb310_mac_2020_alias.tsv")

@@ -7,7 +7,9 @@ def log(x):
   print(datetime.datetime.now().strftime("%H:%M:%S: ") + str(x))
 
 def make_parent_dir(file_name):
-  os.makedirs(os.path.dirname(file_name), exist_ok=True)
+  dir_name = os.path.dirname(file_name)
+  if len(dir_name) > 0: # in case file name without dir
+    os.makedirs(os.path.dirname(file_name), exist_ok=True)
 
 def read_tsv(file: str, **args) -> pd.DataFrame:
   return pd.read_csv(file, sep="\t", **args)
