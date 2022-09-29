@@ -33,7 +33,6 @@ OXYTRI_MAC_2020_VARIANT = os.path.join(DATA_DIR, "oxy_tri_jrb310_mac_2020_varian
 OXYTRI_MAC_2012_PROTEIN = os.path.join(DATA_DIR, "Oxytricha_trifallax_022112_aa.tsv")
 OXYTRI_MAC_2020_PROTEIN = os.path.join(DATA_DIR, "oxytrijrb310pacbio_aa.tsv")
 
-
 TABLE_DUMP_LIST = [
   "alias",
   "contig",

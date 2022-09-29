@@ -1689,7 +1689,7 @@ def parse_args():
   return args
 
 if __name__ == "__main__":
-  sys.argv = "python/create_main.py -o mds_ies_db_data_7 -i sdrap_ewoo_Sep_28_2022 -p eupwoo_mac2022_mic2022 -s all --port 8888".split(" ")
+  sys.argv = "python/create_main.py -o mds_ies_db_data_7 -i sdrap_ewoo_Sep_29_2022 -p eupwoo_mac2022_mic2022 -s all --port 8888".split(" ")
   args = parse_args()
   mysql_utils.set_port(args.port)
   create_all(args.output_db, args.input_db, args.preset, args.stages)
