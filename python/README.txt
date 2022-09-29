@@ -1,10 +1,14 @@
 This is the script for importing the SDRAP SQL output to a format usable for viewing on <mds_ies_db>
 
 Examples of running the script for the currently hosted databases:
-> python python/create_main.py -o mds_ies_db_data_5 -i sdrap_oxy_mac2012_May_30_2022 -p oxytri_mac2012_mic2014 -s all
-> python python/create_main.py -o mds_ies_db_data_6 -i sdrap_oxy_mac2020_Jun_13_2022 -p oxytri_mac2020_mic2014 -s all
-> python python/create_main.py -o mds_ies_db_data_7 -i sdrap_ewoo_11032020_pid95_add90 -p ewoo -s all
-> python python/create_main.py -o mds_ies_db_data_8 -i sdrap_tet_10272020_pid95_add90 -p tet -s all
+> python python/create_main.py -o mds_ies_db_data_5 -i sdrap_oxy_mac2012_May_30_2022 -p oxytri_mac2012_mic2014 -s all --port 8888
+> python python/create_main.py -o mds_ies_db_data_6 -i sdrap_oxy_mac2020_Jun_13_2022 -p oxytri_mac2020_mic2014 -s all --port 8888
+> python python/create_main.py -o mds_ies_db_data_7 -i sdrap_ewoo_11032020_pid95_add90 -p eupwoo_mac2022_mic2022 -s all --port 8888
+> python python/create_main.py -o mds_ies_db_data_8 -i sdrap_tet_10272020_pid95_add90 -p tetsp_mac2015_mic2022 -s all --port 8888
+> python python/create_main.py -o mds_ies_db_data_8 -i sdrap_tet_Sep_28_2022 -p tetsp_mac2015_mic2022 -s all --port 8888
+> python python/create_main.py -o mds_ies_db_data_7 -i sdrap_ewoo_Sep_28_2022 -p eupwoo_mac2022_mic2022 -s all --port 8888
+
+These examples assume that the local port 8888 is forwarded to the server MYSQL port 3306.
 
 Download section on <mds_ies_db>
 -------------------------------

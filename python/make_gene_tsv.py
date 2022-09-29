@@ -250,6 +250,18 @@ def fix_oxytri_tglo_1(data, hightxn):
       row["attr_note"] = gene_note
   return pd.DataFrame.from_records(data)
 
+# Problems to fix:
+# 1. Remove "CDS" features which seem to be duplicate of "exon".
+#    Only keep "gene", "mRNA", "exon" features.
+def fix_tetsp_mac2015(data):
+  return data.loc[data["type"].isin(["gene", "mRNA", "exon"])].copy()
+
+# Problems to fix:
+# 1. Remove "CDS" features which seem to be duplicate of "exon".
+#    Only keep "gene", "mRNA", "exon" features.
+def fix_eupwoo_mac2022(data):
+  return data.loc[data["type"].isin(["gene", "mRNA", "exon"])].copy()
+
 def make_oxytri_mac2020_gene_tsv():
   data = read_gff_as_tsv(constants.OXYTRI_MAC_2020_GENE_GFF)
   data = parse_gff(data, "mac")
@@ -293,7 +305,24 @@ def make_oxytri_mic2014_tglo_tsv(hightxn):
     file_out = constants.OXYTRI_MIC_2014_GENE_LOWTXN_TSV
   common_utils.log(file_out)
   common_utils.write_tsv(data, file_out)
-  
+
+def make_tetsp_mac2015_gene_tsv():
+  data = read_gff_as_tsv(constants.TETSP_MAC_2015_GENE_GFF)
+  data = parse_gff(data, "mac")
+  data = fix_tetsp_mac2015(data)
+  data = get_attr_parent_gene(data)
+  file_out = constants.TETSP_MAC_2015_GENE_TSV
+  common_utils.log(file_out)
+  common_utils.write_tsv(data, file_out)
+
+def make_eupwoo_mac2022_gene_tsv():
+  data = read_gff_as_tsv(constants.EUPWOO_MAC_2022_GENE_GFF)
+  data = parse_gff(data, "mac")
+  data = fix_eupwoo_mac2022(data)
+  data = get_attr_parent_gene(data)
+  file_out = constants.EUPWOO_MAC_2022_GENE_TSV
+  common_utils.log(file_out)
+  common_utils.write_tsv(data, file_out)
 
 def main():
   make_oxytri_mac2020_gene_tsv()
@@ -301,6 +330,8 @@ def main():
   make_oxytri_mic2014_gene_tsv()
   make_oxytri_mic2014_tglo_tsv(True)
   make_oxytri_mic2014_tglo_tsv(False)
+  make_tetsp_mac2015_gene_tsv()
+  make_eupwoo_mac2022_gene_tsv()
 
 if __name__ == "__main__":
   main()

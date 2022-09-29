@@ -24,19 +24,66 @@ def create_database(db: str):
   cursor.close()
   conn.close()
 
+# def create_name_temp_table(
+#   db_to: str,
+#   db_from: str,
+#   mac_name_regex: str,
+#   mic_name_regex: str,
+# ):
+#   common_utils.log(
+#     f"create_name_temp_table {db_to} {db_from}" +
+#     f" {mac_name_regex} {mic_name_regex}"
+#   )
+
+#   conn = mysql_utils.get_connection()
+#   cursor = conn.cursor()
+#   cursor.execute(f"DROP TABLE IF EXISTS `{db_to}`.`name_temp`;")
+#   cursor.execute(
+#     f"""
+#     CREATE TABLE `{db_to}`.`name_temp` (
+#       `contig_id` INT NOT NULL,
+#       `name` VARCHAR(50) NOT NULL,
+#       PRIMARY KEY (`contig_id`),
+#       KEY `name` (`name`)
+#     );
+#     """
+#   )
+
+#   # Reqrite this to join the tables alias w/ the regular in memoery then uplaod
+
+#   cursor.execute(
+#     f"""
+#     INSERT INTO `{db_to}`.`name_temp`
+#     (
+#       `contig_id`,
+#       `name`
+#     )
+#     SELECT
+#       `nuc_id`,
+#       `alias`
+#     FROM `{db_from}`.`alias`
+#     WHERE `alias` REGEXP '{mac_name_regex}'
+#     OR `alias` REGEXP '{mic_name_regex}';
+#     """
+#   )
+
+#   cursor.close()
+#   conn.close()
+
 def create_name_temp_table(
   db_to: str,
   db_from: str,
   mac_name_regex: str,
   mic_name_regex: str,
+  alias_files: list[str],
 ):
   common_utils.log(
     f"create_name_temp_table {db_to} {db_from}" +
-    f" {mac_name_regex} {mic_name_regex}"
+    f" {mac_name_regex} {mic_name_regex} {alias_files}"
   )
 
   conn = mysql_utils.get_connection()
-  cursor = conn.cursor()
+  cursor = conn.cursor(dictionary=True)
   cursor.execute(f"DROP TABLE IF EXISTS `{db_to}`.`name_temp`;")
   cursor.execute(
     f"""
@@ -49,20 +96,57 @@ def create_name_temp_table(
     """
   )
 
+  name = []
+  for file in alias_files:
+    name += list(common_utils.read_tsv(file)['primary'])
+  name = pd.DataFrame({'name': name})
+
   cursor.execute(
-    f"""
-    INSERT INTO `{db_to}`.`name_temp`
-    (
-      `contig_id`,
-      `name`
-    )
-    SELECT
-      `nuc_id`,
-      `alias`
-    FROM `{db_from}`.`alias`
-    WHERE `alias` REGEXP '{mac_name_regex}'
-    OR `alias` REGEXP '{mic_name_regex}';
-    """
+    f"SELECT `nuc_id` AS `contig_id`, `alias` AS `name` FROM `{db_from}`.`alias`;"
+  )
+  sdrap_alias = pd.DataFrame.from_records(cursor.fetchall())
+  name = pd.merge(name, sdrap_alias, how = 'inner', on = 'name')
+
+  # alias_data = common_utils.read_tsv(file)
+  # alias_data = alias_data.melt(
+  #   id_vars = "primary",
+  #   var_name = "type",
+  #   value_name = "alias",
+  # )
+  # alias_data = alias_data.dropna(axis="index")
+  # alias_data = alias_data.rename({"primary": "name"}, axis="columns")
+  # mysql_utils.upload_in_chunks(
+  #   alias_data,
+  #   ["name", "alias", "type"],
+  #   cursor,
+  #   db_to,
+  #   "alias_temp",
+  #   constants.SQL_BATCH_UPLOAD_ROWS,
+  # )
+
+
+  # cursor.execute(
+  #   f"""
+  #   INSERT INTO `{db_to}`.`name_temp`
+  #   (
+  #     `contig_id`,
+  #     `name`
+  #   )
+  #   SELECT
+  #     `nuc_id`,
+  #     `alias`
+  #   FROM `{db_from}`.`alias`
+  #   WHERE `alias` REGEXP '{mac_name_regex}'
+  #   OR `alias` REGEXP '{mic_name_regex}';
+  #   """
+  # )
+  mysql_utils.upload_in_chunks(
+    name,
+    ['contig_id', 'name'],
+    cursor,
+    db_to,
+    'name_temp',
+    constants.SQL_BATCH_UPLOAD_ROWS,
   )
 
   cursor.close()
@@ -1468,11 +1552,18 @@ def create_all(db_to: str, db_from: str, preset: str, stages: list[str]):
   if "create" in stages:
     create_database(db_to)
   if "contig" in stages:
+    # create_name_temp_table(
+    #   db_to,
+    #   db_from,
+    #   constants.PRESETS[preset].get("mac_name_regex", ".*"),
+    #   constants.PRESETS[preset].get("mic_name_regex", ".*"),
+    # )
     create_name_temp_table(
       db_to,
       db_from,
       constants.PRESETS[preset].get("mac_name_regex", ".*"),
       constants.PRESETS[preset].get("mic_name_regex", ".*"),
+      constants.PRESETS[preset]['alias_files'],
     )
     create_contig_table(db_to, db_from)
   if "match" in stages:
@@ -1598,6 +1689,7 @@ def parse_args():
   return args
 
 if __name__ == "__main__":
+  sys.argv = "python/create_main.py -o mds_ies_db_data_7 -i sdrap_ewoo_Sep_28_2022 -p eupwoo_mac2022_mic2022 -s all --port 8888".split(" ")
   args = parse_args()
   mysql_utils.set_port(args.port)
   create_all(args.output_db, args.input_db, args.preset, args.stages)
@@ -1606,5 +1698,5 @@ if __name__ == "__main__":
 # with port 8888 on local machine SSH forwarded to the main server.
 # python python/create_main.py -o mds_ies_db_data_5 -i sdrap_oxy_mac2012_May_30_2022 -p oxytri_mac2012_mic2014 -s protein --port 8888
 # python python/create_main.py -o mds_ies_db_data_6 -i sdrap_oxy_mac2020_Jun_13_2022 -p oxytri_mac2020_mic2014 -s protein --port 8888
-# python python/create_main.py -o mds_ies_db_data_7 -i sdrap_ewoo_11032020_pid95_add90 -p ewoo -s protein --port 8888
-# python python/create_main.py -o mds_ies_db_data_8 -i sdrap_tet_10272020_pid95_add90 -p tet -s protein --port 8888
+# python python/create_main.py -o mds_ies_db_data_7 -i sdrap_ewoo_11032020_pid95_add90 -p eupwoo_mac2022_mic2022 -s protein --port 8888
+# python python/create_main.py -o mds_ies_db_data_8 -i sdrap_tet_10272020_pid95_add90 -p tetsp_mac2015_mic2022 -s protein --port 8888

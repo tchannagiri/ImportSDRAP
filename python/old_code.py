@@ -132,5 +132,29 @@ def create_alias_table(
     #     VALUES {values};
     #     """
     #   )
-  cursor.close()
-  conn.close()
+  # cursor.close()
+  # conn.close()
+
+
+# Problems to fix:
+# 1. Remove "CDS" features which seem to be duplicate of "exon".
+#    Only keep "gene", "mRNA", "exon" features.
+# 2. The names used are genbank "LASUXXX" format, so convert them to primary
+#    format "ContigXXX".
+# def fix_tetsp_mac2015(data):
+#   data = data.loc[data["type"].isin(["gene", "mRNA", "exon"])].reset_index(drop=True).copy()
+#   alias = pd.read_csv(constants.TETSP_MAC_2015_ALIAS, sep="\t").set_index("genbank")
+
+#   data["contig_name_new"] = alias.loc[data["contig_name"], "primary"].reset_index(drop=True)
+#   data = data.to_dict("records")
+#   for row in data:
+#     contig_name_old = row["contig_name"]
+#     contig_name_new = row["contig_name_new"]
+#     row["attr_id"] = row["attr_id"].replace(row["contig_name"], row["contig_name_new"])
+#     for key in ["contig_name", "attr_id", "attr_name", "attr_parent"]:
+#       if row[key] is not None:
+#         row[key] = row[key].replace(contig_name_old, contig_name_new)
+
+#   data = pd.DataFrame.from_records(data)
+#   data = data.drop("contig_name_new", axis="columns")
+#   return data

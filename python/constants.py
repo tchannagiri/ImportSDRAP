@@ -4,6 +4,7 @@ SQL_BATCH_UPLOAD_ROWS = 1000
 SQL_BATCH_DOWNLOAD_ROWS = 10000
 
 DATA_DIR = "python/data"
+
 OXYTRI_MAC_2020_GENE_GFF = os.path.join(DATA_DIR, "O_trifallax_2020-upd3.gff3")
 OXYTRI_MAC_2020_GENE_TSV = os.path.join(DATA_DIR, "O_trifallax_2020-upd3_gene.tsv")
 OXYTRI_MAC_2012_GENE_GFF = os.path.join(DATA_DIR, "Oxytricha_trifallax_022112.gff3")
@@ -14,10 +15,18 @@ OXYTRI_MIC_2014_GENE_HIGHTXN_GFF = os.path.join(DATA_DIR, "tglo_final_hightxn.gf
 OXYTRI_MIC_2014_GENE_HIGHTXN_TSV = os.path.join(DATA_DIR, "tglo_final_hightxn.tsv")
 OXYTRI_MIC_2014_GENE_LOWTXN_GFF = os.path.join(DATA_DIR, "tglo_final_lowtxn.gff")
 OXYTRI_MIC_2014_GENE_LOWTXN_TSV = os.path.join(DATA_DIR, "tglo_final_lowtxn.tsv")
+TETSP_MAC_2015_GENE_GFF = os.path.join(DATA_DIR, "MDS_IES_DB_renamed_tetpusstrmac_2019.gff3")
+TETSP_MAC_2015_GENE_TSV = os.path.join(DATA_DIR, "MDS_IES_DB_renamed_tetpusstrmac_2019.tsv")
+EUPWOO_MAC_2022_GENE_GFF = os.path.join(DATA_DIR, "NCBI_renamed_oriented_Ewoo_EVM.all.v4.4.gff3")
+EUPWOO_MAC_2022_GENE_TSV = os.path.join(DATA_DIR, "NCBI_renamed_oriented_Ewoo_EVM.all.v4.4.tsv")
 
 OXYTRI_MAC_2012_ALIAS = os.path.join(DATA_DIR, "oxy_tri_jrb310_mac_2012_alias.tsv")
 OXYTRI_MAC_2020_ALIAS = os.path.join(DATA_DIR, "oxy_tri_jrb310_mac_2020_alias.tsv")
 OXYTRI_MIC_2014_ALIAS = os.path.join(DATA_DIR, "oxy_tri_jrb310_mic_2014_alias.tsv")
+TETSP_MAC_2015_ALIAS = os.path.join(DATA_DIR, "tet_sp_sej2015_mac_2015_alias.tsv")
+TETSP_MIC_2022_ALIAS = os.path.join(DATA_DIR, "tet_sp_sej2015_mic_2022_alias.tsv")
+EUPWOO_MAC_2022_ALIAS = os.path.join(DATA_DIR, "eup_woo_iz01_mac_2022_alias.tsv")
+EUPWOO_MIC_2022_ALIAS = os.path.join(DATA_DIR, "eup_woo_iz01_mic_2022_alias.tsv")
 
 OXYTRI_MAC_2020_VARIANT = os.path.join(DATA_DIR, "oxy_tri_jrb310_mac_2020_variant.tsv")
 
@@ -102,11 +111,11 @@ PRESETS = {
     "strain": "JRB310",
     "taxonomy_id": "1172189",
   },
-  "tet": {
-    "mac_name_regex": ".*", 
-    "mic_name_regex": ".*",
-    "gene_files": [],
-    "alias_files": [],
+  "tetsp_mac2015_mic2022": {
+    "mac_name_regex": "^LASU.*$", 
+    "mic_name_regex": "^TMEMEN_MIC_.*$",
+    "gene_files": [TETSP_MAC_2015_GENE_TSV],
+    "alias_files": [TETSP_MAC_2015_ALIAS, TETSP_MIC_2022_ALIAS],
     "variant_files": [],
     "protein_files": [],
     "name": "Tetmemena sp. SeJ-2015 (MAC 2015/MIC 2022)",
@@ -119,11 +128,11 @@ PRESETS = {
     "strain": "SeJ-2015",
     "taxonomy_id": "200606",
   },
-  "ewoo": {
-    "mac_name_regex": ".*", 
-    "mic_name_regex": ".*",
-    "gene_files": [],
-    "alias_files": [],
+  "eupwoo_mac2022_mic2022": {
+    "mac_name_regex": "^EUPWOO_MAC_.*$", 
+    "mic_name_regex": "^EUPWOO_MIC_.*$",
+    "gene_files": [EUPWOO_MAC_2022_GENE_TSV],
+    "alias_files": [EUPWOO_MAC_2022_ALIAS, EUPWOO_MIC_2022_ALIAS],
     "variant_files": [],
     "protein_files": [],
     "name": "Euplotes woodruffi Iz01 (MAC 2022/MIC 2022)",
