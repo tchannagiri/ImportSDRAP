@@ -191,7 +191,6 @@ def create_ies_table(db: str, ies_type: str):
     "weak": "segments on the precursor contigs that lie between 2 product matches",
   }
 
-  cursor = conn.cursor()
   cursor.execute(f"DROP TABLE IF EXISTS `{db}`.`ies_{ies_type}`;")
   cursor.execute(
     f"""

@@ -114,7 +114,10 @@ PRESETS = {
     "mac_name_regex": "^LASU.*$", 
     "mic_name_regex": "^TMEMEN_MIC_.*$",
     "gene_files": [TETSP_MAC_2015_GENE_TSV],
-    "alias_files": [TETSP_MAC_2015_ALIAS, TETSP_MIC_2022_ALIAS],
+    "alias_files": [
+      {"file": TETSP_MAC_2015_ALIAS, "table": "contig", "nucleus": "mac"},
+      {"file": TETSP_MIC_2022_ALIAS, "table": "contig", "nucleus": "mic"},
+    ],
     "variant_files": [],
     "protein_files": [],
     "name": "Tetmemena sp. SeJ-2015 (MAC 2015/MIC 2022)",
@@ -131,7 +134,10 @@ PRESETS = {
     "mac_name_regex": "^EUPWOO_MAC_.*$", 
     "mic_name_regex": "^EUPWOO_MIC_.*$",
     "gene_files": [EUPWOO_MAC_2022_GENE_TSV],
-    "alias_files": [EUPWOO_MAC_2022_ALIAS, EUPWOO_MIC_2022_ALIAS],
+    "alias_files": [
+      {"file": EUPWOO_MAC_2022_ALIAS, "table": "contig", "nucleus": "mac"},
+      {"file": EUPWOO_MIC_2022_ALIAS, "table": "contig", "nucleus": "mic"},
+    ],
     "variant_files": [],
     "protein_files": [],
     "name": "Euplotes woodruffi Iz01 (MAC 2022/MIC 2022)",
