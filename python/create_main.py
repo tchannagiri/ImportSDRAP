@@ -97,14 +97,14 @@ def create_name_temp_table(
 
   name = []
   for file in alias_files:
-    name += list(common_utils.read_tsv(file)['primary'])
-  name = pd.DataFrame({'name': name})
+    name += list(common_utils.read_tsv(file)["primary"])
+  name = pd.DataFrame({"name": name})
 
   cursor.execute(
     f"SELECT `nuc_id` AS `contig_id`, `alias` AS `name` FROM `{db_from}`.`alias`;"
   )
   sdrap_alias = pd.DataFrame.from_records(cursor.fetchall())
-  name = pd.merge(name, sdrap_alias, how = 'inner', on = 'name')
+  name = pd.merge(name, sdrap_alias, how = "inner", on = "name")
 
   # alias_data = common_utils.read_tsv(file)
   # alias_data = alias_data.melt(
@@ -141,10 +141,10 @@ def create_name_temp_table(
   # )
   mysql_utils.upload_in_chunks(
     name,
-    ['contig_id', 'name'],
+    ["contig_id", "name"],
     cursor,
     db_to,
-    'name_temp',
+    "name_temp",
     constants.SQL_BATCH_UPLOAD_ROWS,
   )
 
@@ -1562,7 +1562,7 @@ def create_all(db_to: str, db_from: str, preset: str, stages: list[str]):
       db_from,
       constants.PRESETS[preset].get("mac_name_regex", ".*"),
       constants.PRESETS[preset].get("mic_name_regex", ".*"),
-      constants.PRESETS[preset]['alias_files'],
+      [file["file"] for file in constants.PRESETS[preset]["alias_files"]],
     )
     create_contig_table(db_to, db_from)
   if "match" in stages:
@@ -1634,7 +1634,9 @@ In order to complete the installation of the database on <mds_ies_db>,
     <mds_ies_db> root to be available for download.
   3. The genome FASTA and GFF files must be copied to the appropriate directory in the
     <mds_ies_db> root to be available for download.
-  4. The `publish` parameter in the database directory must be set to TRUE for the
+  4. The BLAST databases must be generated in the <mds_ies_db> root's blast directory
+    from the genome FASTA file for the the sequence search to work.
+  5. The `publish` parameter in the database directory must be set to TRUE for the
       database to be visible on <mds_ies_db>.
     """
   )
