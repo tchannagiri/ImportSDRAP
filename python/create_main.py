@@ -1480,7 +1480,7 @@ def add_to_directory(
       `genus`,
       `species`,
       `strain`,
-      `taxonmy_id`,
+      `taxonomy_id`,
       `publish`
     )
     VALUES
