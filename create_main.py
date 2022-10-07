@@ -1693,10 +1693,3 @@ if __name__ == "__main__":
   args = parse_args()
   mysql_utils.set_port(args.port)
   create_all(args.output_db, args.input_db, args.preset, args.stages)
-
-# Example commands for creating the current databases (only the protein stage)
-# with port 8888 on local machine SSH forwarded to the main server.
-# python python/create_main.py -o mds_ies_db_data_5 -i sdrap_oxy_mac2012_May_30_2022 -p oxytri_mac2012_mic2014 -s protein --port 8888
-# python python/create_main.py -o mds_ies_db_data_6 -i sdrap_oxy_mac2020_Jun_13_2022 -p oxytri_mac2020_mic2014 -s protein --port 8888
-# python python/create_main.py -o mds_ies_db_data_7 -i sdrap_ewoo_11032020_pid95_add90 -p eupwoo_mac2022_mic2022 -s protein --port 8888
-# python python/create_main.py -o mds_ies_db_data_8 -i sdrap_tet_10272020_pid95_add90 -p tetsp_mac2015_mic2022 -s protein --port 8888
